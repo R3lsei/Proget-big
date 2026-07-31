@@ -2,6 +2,7 @@
 // 5 zones : cellule → couloir de détention → laboratoire → salle serveurs → hangar de sortie.
 
 import * as THREE from 'three';
+import { GLTFLoader } from '../lib/GLTFLoader.js';
 
 export const colliders = [];        // THREE.Box3 solides
 export const interactables = [];    // { id, mesh, label, dist }
@@ -323,6 +324,10 @@ function buildCorridor() {
   const sign = textSign('BLOC DE DÉTENTION A', 2.2, 0.5);
   sign.position.set(0, 2.5, -3.2); sign.rotation.y = 0;
 
+  // casier du gardien (secret optionnel : un peu d'histoire)
+  const locker = box(0.55, 1.7, 0.45, M.darkMetal, 1.32, 0.85, -8.2);
+  registerInteract('casier', locker, 'Casier du gardien — cadenassé', 2.4);
+
   // caméra de surveillance (plafond, avant la porte codée)
   const camG = new THREE.Group();
   const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.3, 8), M.darkMetal);
@@ -378,7 +383,50 @@ function buildLab() {
   box(6.2, 3.6, 0.3, M.concrete, -4.2, 1.8, -35.15);
   box(6.2, 3.6, 0.3, M.concrete, 4.2, 1.8, -35.15);
   box(2.4, 0.9, 0.3, M.concrete, 0, 3.15, -35.15, { solid: false });
-  slidingDoor('porte_labo_srv', 0, -35.15, { width: 2.2, label: 'Sas de service — hors tension' });
+  slidingDoor('porte_labo_srv', 0, -35.15, { width: 2.2, label: 'Sas de service' });
+
+  // ---- conduite de vapeur crevée balayant l'accès au sas ----
+  const steamPipe = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 2.8, 10), M.rust);
+  steamPipe.rotation.z = Math.PI / 2;
+  steamPipe.position.set(0, 2.7, -34.45);
+  scene.add(steamPipe);
+  registerInteract('valve_vapeur', steamPipe, 'Conduite de vapeur crevée — valve grippée', 3.2);
+
+  const sCount = 70;
+  const sgeo = new THREE.BufferGeometry();
+  const spos = new Float32Array(sCount * 3);
+  const sseed = new Float32Array(sCount);
+  for (let i = 0; i < sCount; i++) {
+    spos[i * 3] = (Math.random() - 0.5) * 2.2;
+    spos[i * 3 + 1] = 2.6 - Math.random() * 2.4;
+    spos[i * 3 + 2] = -34.45 + (Math.random() - 0.5) * 0.5;
+    sseed[i] = 0.6 + Math.random();
+  }
+  sgeo.setAttribute('position', new THREE.BufferAttribute(spos, 3));
+  const smat = new THREE.PointsMaterial({
+    color: 0xcfd8d4, size: 0.34, map: glowSprite(), transparent: true,
+    opacity: 0.35, depthWrite: false,
+  });
+  const steam = new THREE.Points(sgeo, smat);
+  scene.add(steam);
+  doors._steam = { active: true, on: true, points: steam, mat: smat };
+  animated.push((dt, t) => {
+    const S = doors._steam;
+    if (!S.active) return;
+    S.on = (t % 4) < 2.6; // jets cycliques : 2,6 s de vapeur, 1,4 s de répit
+    const target = S.on ? 0.35 : 0.03;
+    S.mat.opacity += (target - S.mat.opacity) * Math.min(1, dt * 5);
+    const arr = S.points.geometry.attributes.position.array;
+    for (let i = 0; i < sCount; i++) {
+      arr[i * 3 + 1] -= dt * sseed[i] * 1.6;
+      arr[i * 3] += (Math.random() - 0.5) * dt * 0.8;
+      if (arr[i * 3 + 1] < 0.05) {
+        arr[i * 3 + 1] = 2.6;
+        arr[i * 3] = (Math.random() - 0.5) * 0.6;
+      }
+    }
+    S.points.geometry.attributes.position.needsUpdate = true;
+  });
 
   const sign = textSign('LABORATOIRE 3 — BIOCONTRÔLE', 3.2, 0.55);
   sign.position.set(0, 2.9, -21.32); sign.rotation.y = Math.PI;
@@ -785,3 +833,55 @@ export function getLasersActive() { return doors._lasers?.active; }
 export function getDogCalm() { return doors._dog?.calm; }
 export function getSecuCamActive() { return doors._secucam?.active; }
 export function getDogPosition() { return doors._dog?.group.position; }
+export function getSteamActive() { return doors._steam?.active; }
+export function getSteamOn() { return doors._steam?.active && doors._steam?.on; }
+
+export function neutralizeSteam() {
+  const S = doors._steam;
+  if (!S) return;
+  S.active = false;
+  let p = 0;
+  animated.push((dt) => {
+    if (p >= 1) { S.points.visible = false; return; }
+    p = Math.min(1, p + dt * 1.5);
+    S.mat.opacity = (1 - p) * S.mat.opacity;
+  });
+  setInteractLabel('valve_vapeur', 'Valve refermée — conduite inerte');
+  setInteractEnabled('valve_vapeur', false);
+}
+
+export function openLocker() {
+  setInteractLabel('casier', 'Casier ouvert — journal du gardien');
+  setInteractEnabled('casier', false);
+}
+
+// ------------------------------------------------------------------
+// Props générés par Tripo3D : l'objet réel scanné apparaît « physiquement »
+// ------------------------------------------------------------------
+const gltfLoader = new GLTFLoader();
+export function spawnGeneratedProp(url, position, onDone) {
+  gltfLoader.load(url, (gltf) => {
+    const obj = gltf.scene;
+    // normalise la taille à ~40 cm et pose l'objet au sol
+    const bb = new THREE.Box3().setFromObject(obj);
+    const size = bb.getSize(new THREE.Vector3());
+    const scale = 0.4 / Math.max(size.x, size.y, size.z, 0.001);
+    obj.scale.setScalar(scale);
+    bb.setFromObject(obj);
+    const center = bb.getCenter(new THREE.Vector3());
+    obj.position.set(position.x - center.x, -bb.min.y + 0.02, position.z - center.z);
+    obj.traverse((n) => { if (n.isMesh) { n.castShadow = true; n.receiveShadow = true; } });
+    scene.add(obj);
+    // halo de matérialisation
+    const glow = new THREE.PointLight(0x35e0a1, 6, 3, 2);
+    glow.position.set(position.x, 0.5, position.z);
+    scene.add(glow);
+    let life = 0;
+    animated.push((dt, t) => {
+      life += dt;
+      glow.intensity = Math.max(0, 6 - life * 2) + Math.sin(t * 3) * 0.4;
+      obj.rotation.y += dt * 0.4;
+    });
+    if (onDone) onDone();
+  }, undefined, () => { /* modèle illisible : on ignore */ });
+}

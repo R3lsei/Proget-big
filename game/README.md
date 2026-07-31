@@ -8,12 +8,15 @@ capacités logiques, et le matérialise dans votre inventaire pour résoudre les
 
 ## Lancer le jeu
 
-Le jeu est 100 % statique — il suffit d'un serveur HTTP local (la caméra exige
-`http://localhost` ou HTTPS) :
+Deux façons de servir le jeu (la caméra exige `http://localhost` ou HTTPS) :
 
 ```bash
-cd game
-python3 -m http.server 8000
+# Recommandé : avec le pont Tripo3D (objets scannés → vrais modèles 3D en jeu)
+pip install -r requirements.txt   # une fois, à la racine du dépôt
+python serve.py                   # TRIPO_API_KEY dans .env pour activer le pont
+
+# Ou en statique pur (le jeu complet fonctionne aussi comme ça)
+cd game && python3 -m http.server 8000
 # puis ouvrir http://localhost:8000 dans Chrome / Edge / Firefox
 ```
 
@@ -48,8 +51,10 @@ votre caméra. Cinq chapitres vous séparent de la surface :
 1. **Le réveil** — poignets liés dans la cellule C-23 : trouvez de quoi couper.
 2. **Le bloc A** — crochetez la porte ou faites levier sur la grille d'aération.
 3. **Œil pour œil** — neutralisez la caméra de surveillance, trouvez le code de la porte.
-4. **La zone chaude** — éteignez le feu chimique du laboratoire, récupérez le badge niveau 4.
+4. **La zone chaude** — éteignez le feu chimique du laboratoire, récupérez le badge niveau 4, franchissez la conduite de vapeur qui balaie le sas.
 5. **Le cœur de NOVA-7** — piratez le terminal, désactivez la grille laser, amadouez le chien de garde, et montez vers la lumière.
+
+Un secret optionnel (le casier du gardien, dans le bloc A) éclaire l'histoire.
 
 ## Les critères logiques automatiques
 
@@ -66,6 +71,8 @@ Chaque objet détecté par la caméra reçoit des capacités déduites de sa nat
 | Bouteille, tasse, verre, bol | 💧 Liquide, 💥 Briser | Éteindre le feu, casser la vitre de l'armoire |
 | Banane, pomme, sandwich, pizza… | 🍎 Nourrir, 🎯 Distraire | Le chien de garde |
 | Ballon, vase | 💥 Briser, 🎯 Distraire | Vitre blindée, diversion |
+| Cravate, parapluie, sac | 🛡️ Protéger | Refermer la valve de vapeur brûlante |
+| Horloge (ou téléphone) | ⏱️ Chronométrer | Passer entre deux jets de vapeur |
 | Objet inconnu | 🎯 Distraire | Rien n'est inutile : ça se lance |
 
 La plupart des épreuves acceptent **plusieurs solutions** (pirater *ou*
@@ -86,8 +93,19 @@ game/
     items.js        moteur de règles : classe détectée → capacités logiques
     story.js        chapitres, épreuves, dialogues du Dr Lenoir
     audio.js        ambiance et bruitages 100 % procéduraux + voix de synthèse
-  lib/              three.js, tfjs, coco-ssd embarqués (aucun CDN requis)
+    tripo.js        pont optionnel vers Tripo3D (désactivé sans backend)
+  lib/              three.js, GLTFLoader, tfjs, coco-ssd embarqués (aucun CDN requis)
+../serve.py         serveur de dev : sert game/ + POST /api/tripo3d
 ```
+
+## Pont Tripo3D (optionnel)
+
+Servi par `python serve.py` avec une `TRIPO_API_KEY` (voir la racine du dépôt),
+chaque objet réel scanné est envoyé à l'intégration **Tripo3D** du dépôt : un
+vrai modèle 3D photoréaliste est généré (~1-2 min), mis en cache dans
+`game/generated/<classe>/`, puis **apparaît physiquement devant vous** dans le
+complexe, dans un halo de matérialisation. Sans clé ni backend, le module se
+désactive silencieusement — le jeu reste complet.
 
 Astuce développeur : dans la console, `NOVA.debug = true` permet de jouer sans
 verrouillage de la souris (utile pour les tests automatisés).

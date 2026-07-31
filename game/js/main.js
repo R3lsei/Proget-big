@@ -3,8 +3,10 @@
 import * as THREE from 'three';
 import {
   buildWorld, updateWorld, interactables, setFlashlight, isFlashlightOn,
-  getSecuCamActive, getFireActive, getLasersActive, getDogCalm,
+  getSecuCamActive, getFireActive, getLasersActive, getDogCalm, getSteamActive,
+  spawnGeneratedProp,
 } from './world.js';
+import { requestRealModel } from './tripo.js';
 import { Player } from './player.js';
 import { loadModel, openScanner, closeScanner, captureStableObject, onDetectionAnnounce } from './vision.js';
 import { initAudio, resumeAudio, speak, sfxScan } from './audio.js';
@@ -39,7 +41,7 @@ const player = new Player(camera, renderer.domElement);
 // Console de développement : NOVA.debug = true permet de jouer sans pointer lock.
 window.NOVA = {
   player, state, debug: false,
-  world: { getSecuCamActive, getFireActive, getLasersActive, getDogCalm },
+  world: { getSecuCamActive, getFireActive, getLasersActive, getDogCalm, getSteamActive },
 };
 
 // ------------------------------------------------------------------
@@ -212,6 +214,11 @@ function captureItem() {
   const item = captureStableObject();
   if (!item) return;
   materializeItem(item);
+  // pont Tripo3D : l'objet apparaîtra physiquement devant le joueur (si backend)
+  requestRealModel(item, () => {
+    const f = player.forwardDir.multiplyScalar(1.4);
+    return { x: player.position.x + f.x, z: player.position.z + f.z };
+  }, ui, spawnGeneratedProp);
   closeScanner();
   elScanner.classList.add('hidden');
   scannerOpen = false;

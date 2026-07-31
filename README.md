@@ -6,7 +6,10 @@ image-to-3D generation).
 
 Also in this repo: **[NOVA-7 : Protocole Évasion](game/README.md)** — a
 browser FPS escape game where real objects shown to your webcam are detected
-(COCO-SSD) and materialized as usable in-game items. See `game/README.md`.
+(COCO-SSD) and materialized as usable in-game items. Run it with
+`python serve.py` to also enable the Tripo3D bridge: every scanned object is
+regenerated as a real 3D model that appears inside the game. See
+`game/README.md`.
 
 ## Setup
 

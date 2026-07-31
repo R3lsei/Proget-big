@@ -4,8 +4,9 @@
 import { findItemWithCap, CAPS } from './items.js';
 import {
   openDoor, openVent, disableSecuCam, extinguishFire, breakCabinet,
-  disableLasers, calmDog, validateBadge,
+  disableLasers, calmDog, validateBadge, neutralizeSteam, openLocker,
   getSecuCamActive, getFireActive, getLasersActive, getDogCalm, getDogPosition,
+  getSteamActive, getSteamOn,
   setInteractLabel,
 } from './world.js';
 import {
@@ -46,7 +47,7 @@ const CHAPTERS = [
   },
   {
     title: 'CHAPITRE 4 — LA ZONE CHAUDE', sub: 'Laboratoire 3 — Biocontrôle',
-    objective: 'Un feu chimique bloque le passage : éteignez-le avec un LIQUIDE (bouteille, tasse…). L\'armoire sécurisée contient un badge niveau 4 : brisez la vitre ou crochetez-la.',
+    objective: 'Un feu chimique bloque le passage : éteignez-le avec un LIQUIDE (bouteille, tasse…). L\'armoire sécurisée contient un badge niveau 4 : brisez la vitre ou crochetez-la. Enfin, une conduite de vapeur crache devant le sas : protégez-vous (cravate, parapluie, sac…) ou chronométrez les jets (horloge, téléphone…).',
   },
   {
     title: 'CHAPITRE 5 — LE CŒUR DE NOVA-7', sub: 'Salle serveurs',
@@ -135,9 +136,50 @@ export function interact(id, player) {
     case 'terminal_srv': return tryTerminal();
     case 'chien': return tryDog();
     case 'lecteur_badge': return tryBadgeReader();
-    case 'porte_labo_srv': return openFreeDoor('porte_labo_srv');
+    case 'valve_vapeur': return trySteamValve();
+    case 'casier': return tryLocker();
+    case 'porte_labo_srv': return trySasDoor();
     case 'porte_srv_hangar': return openFreeDoor('porte_srv_hangar');
   }
+}
+
+function trySteamValve() {
+  if (!getSteamActive()) return;
+  const shield = need('proteger');
+  const timer = need('temps');
+  if (shield) {
+    neutralizeSteam();
+    sfxSuccess();
+    ui.notify(`${shield.emoji} Protégé·e par ${shield.name}, vous refermez la valve brûlante à mains couvertes.`);
+    speak('Valve refermée. La vapeur est coupée, le sas est accessible.');
+  } else if (timer) {
+    neutralizeSteam();
+    sfxSuccess();
+    ui.notify(`${timer.emoji} Grâce à ${timer.name}, vous chronométrez les jets : 2,6 s de vapeur, 1,4 s de répit… et vous refermez la valve entre deux souffles !`);
+    speak('Cycle chronométré. Valve refermée entre deux jets. Bien vu.');
+  } else {
+    deny('♨️ La valve est brûlante. <b>Protégez-vous</b> (cravate, parapluie, sac…) ou <b>chronométrez</b> les jets (horloge, téléphone…).', 'Cette vapeur découpe la peau. Protège-toi, ou chronomètre les jets.');
+  }
+}
+
+let lockerOpen = false;
+function tryLocker() {
+  if (lockerOpen) return;
+  const tool = need('crocheter') || need('levier') || need('couper');
+  if (!tool) return deny('🔒 Un cadenas ordinaire. De quoi <b>crocheter</b>, <b>couper</b> ou <b>faire levier</b> en viendrait à bout.', null);
+  lockerOpen = true;
+  openLocker();
+  sfxPickup();
+  ui.notify('📓 <b>Journal du gardien</b> : « Ils ont encore augmenté la dose du 23. Le protocole 7-3-1-9 me donne la nausée. Si quelqu\'un lit ça un jour : je suis désolé. »');
+  ui.subtitle('Dr Lenoir', 'Un journal… Alors même leurs gardiens doutaient. Garde ça en tête, Sujet 23 : tu n\'es pas le monstre de cette histoire.');
+  speak('Même les gardiens doutaient. Tu n\'es pas le monstre de cette histoire.');
+}
+
+function trySasDoor() {
+  if (getSteamActive()) {
+    return deny('♨️ Impossible d\'atteindre le panneau du sas : la vapeur balaie l\'accès. Refermez la valve d\'abord.', 'La vapeur bloque le sas. Occupe-toi de la valve.');
+  }
+  openFreeDoor('porte_labo_srv');
 }
 
 let ventOpen = false;
@@ -356,6 +398,13 @@ export function tick(dt, player) {
     ui.damageFlash();
     player.pushBack(5);
     if (alarmCooldown <= 0) { alarmCooldown = 3; deny('🔥 La chaleur est insoutenable !', null); }
+  }
+
+  // vapeur : traverser pendant un jet ébouillante
+  if (getSteamOn() && p.z < -33.9 && p.z > -35.0 && Math.abs(p.x) < 1.4) {
+    ui.damageFlash();
+    player.pushBack(5);
+    if (alarmCooldown <= 0) { alarmCooldown = 3; deny('♨️ La vapeur bouillante vous repousse !', null); }
   }
 
   // lasers : toucher la grille électrise
