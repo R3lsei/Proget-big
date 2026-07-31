@@ -43,7 +43,7 @@ const CHAPTERS = [
   },
   {
     title: 'CHAPITRE 3 — ŒIL POUR ŒIL', sub: 'Surveillance active',
-    objective: 'Une caméra garde la porte codée. Neutralisez-la (pirater : téléphone, ordinateur… / distraire : objet à lancer), puis trouvez le code (un livre contient toujours des réponses) et franchissez la porte.',
+    objective: 'Une caméra garde la porte codée. Neutralisez-la (pirater : téléphone, ordinateur… / distraire : objet à lancer), puis déchiffrez le code à 4 chiffres : un livre scanné fournit l\'énigme du protocole, et le journal du gardien cache un indice plus direct.',
   },
   {
     title: 'CHAPITRE 4 — LA ZONE CHAUDE', sub: 'Laboratoire 3 — Biocontrôle',
@@ -247,6 +247,7 @@ function trySecuCam() {
 }
 
 let codedDoorOpen = false;
+const DOOR_CODE = '7319';
 function tryCodedDoor() {
   if (codedDoorOpen) return;
   if (getSecuCamActive()) {
@@ -255,21 +256,39 @@ function tryCodedDoor() {
   }
   const book = need('savoir');
   const hack = need('pirater');
+  let hint;
   if (book) {
-    codedDoorOpen = true;
-    ui.notify(`${book.emoji} Dans ${book.name}, une page cornée : « protocole 7-3-1-9 ». Le code du bloc A !`);
-    speak('Code trouvé dans le livre : 7, 3, 1, 9. Porte déverrouillée.');
-  } else if (hack) {
-    codedDoorOpen = true;
-    ui.notify(`${hack.emoji} ${cap1(hack.name)} force le clavier : code 7-3-1-9 extrait de la mémoire.`);
-    speak('Clavier piraté. Porte déverrouillée.');
+    hint = `📖 Une page cornée dans ${book.name} : « Sept salles gardent trois étages. Un seul sujet reste. Neuf gardiens veillent. » À vous de traduire en chiffres.`;
+    speak('Une page cornée. Sept salles gardent trois étages. Un seul sujet reste. Neuf gardiens veillent.');
   } else {
-    return deny('🔢 Porte à code. Un <b>livre</b> révélerait le code… ou <b>piratez</b> le clavier.', 'Il faut le code. Un livre, ou un appareil pour pirater le clavier.');
+    hint = 'Code à 4 chiffres inconnu. Un indice existe forcément : un livre à scanner… ou le journal d\'un gardien, quelque part dans le bloc.';
   }
-  openDoor('porte_code');
-  sfxDoorOpen();
-  startChapter(3);
-  setTimeout(() => sfxFire(true), 800);
+  ui.keypad({
+    hint,
+    answer: DOOR_CODE,
+    canHack: !!hack,
+    hackLabel: hack ? `PIRATER (avec ${hack.name})` : 'PIRATER LE CLAVIER',
+    check: (code) => code === DOOR_CODE,
+    onSuccess: (viaHack) => {
+      codedDoorOpen = true;
+      sfxSuccess();
+      if (viaHack) {
+        ui.notify(`${hack.emoji} ${cap1(hack.name)} force le clavier : code ${DOOR_CODE.split('').join('-')} extrait de la mémoire.`);
+        speak('Clavier piraté. Porte déverrouillée.');
+      } else {
+        ui.notify(`🔢 CODE ACCEPTÉ — vous avez déchiffré l'énigme du protocole. Porte déverrouillée !`);
+        speak('Code accepté. Belle déduction, Sujet 23.');
+      }
+      openDoor('porte_code');
+      sfxDoorOpen();
+      startChapter(3);
+      setTimeout(() => sfxFire(true), 800);
+    },
+    onFail: () => {
+      sfxDeny();
+      ui.notify('🔢 Code refusé. Réfléchissez : chaque phrase de l\'indice cache un chiffre.', true);
+    },
+  });
 }
 
 function tryFire() {

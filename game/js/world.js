@@ -37,31 +37,28 @@ function noisePaint(ctx, s, base, variance, count = 4000) {
 }
 
 function makeMaterials() {
-  const concreteTex = canvasTexture(512, (ctx, s) => {
-    noisePaint(ctx, s, '#8a8d8a', 0.16, 9000);
-    ctx.strokeStyle = 'rgba(0,0,0,0.09)';
-    ctx.lineWidth = 1;
-    for (let i = 0; i < 5; i++) { // fines fissures
-      ctx.beginPath();
-      let x = Math.random() * s, y = Math.random() * s;
-      ctx.moveTo(x, y);
-      for (let j = 0; j < 10; j++) { x += (Math.random() - 0.5) * 26; y += Math.random() * 22; ctx.lineTo(x, y); }
-      ctx.stroke();
+  // murs : panneaux laqués blancs d'un laboratoire propre, joints discrets
+  const panelTex = canvasTexture(512, (ctx, s) => {
+    noisePaint(ctx, s, '#eef1f2', 0.035, 2500);
+    ctx.strokeStyle = 'rgba(150,160,165,0.35)';
+    ctx.lineWidth = 2;
+    const step = s / 2;
+    for (let i = 0; i <= 2; i++) { // joints de panneaux
+      ctx.beginPath(); ctx.moveTo(i * step, 0); ctx.lineTo(i * step, s); ctx.stroke();
     }
-    // taches d'humidité (cercles concentriques, sinon le dégradé devient un cône)
-    for (let i = 0; i < 8; i++) {
-      const cx = Math.random() * s, cy = Math.random() * s;
-      const g = ctx.createRadialGradient(cx, cy, 4, cx, cy, 40 + Math.random() * 50);
-      g.addColorStop(0, 'rgba(40,45,40,0.15)');
-      g.addColorStop(1, 'rgba(40,45,40,0)');
-      ctx.fillStyle = g;
-      ctx.fillRect(0, 0, s, s);
-    }
-  }, [2, 1.2]);
+    ctx.beginPath(); ctx.moveTo(0, s * 0.72); ctx.lineTo(s, s * 0.72); ctx.stroke();
+    // légère usure au bas des panneaux
+    const g = ctx.createLinearGradient(0, s * 0.85, 0, s);
+    g.addColorStop(0, 'rgba(120,130,135,0)');
+    g.addColorStop(1, 'rgba(120,130,135,0.12)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, s, s);
+  }, [2, 1]);
 
+  // sol : grands carreaux clairs légèrement satinés
   const floorTex = canvasTexture(512, (ctx, s) => {
-    noisePaint(ctx, s, '#565a58', 0.12, 7000);
-    ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+    noisePaint(ctx, s, '#d4d9db', 0.05, 4000);
+    ctx.strokeStyle = 'rgba(120,130,135,0.5)';
     ctx.lineWidth = 3;
     const step = s / 4;
     for (let i = 0; i <= 4; i++) {
@@ -71,25 +68,25 @@ function makeMaterials() {
   }, [3, 3]);
 
   const metalTex = canvasTexture(256, (ctx, s) => {
-    noisePaint(ctx, s, '#6e7478', 0.09, 3000);
-    ctx.fillStyle = 'rgba(255,255,255,0.05)';
+    noisePaint(ctx, s, '#b8bec2', 0.06, 3000);
+    ctx.fillStyle = 'rgba(255,255,255,0.08)';
     for (let i = 0; i < 40; i++) ctx.fillRect(0, Math.random() * s, s, 1); // brossé
   });
 
   const rustTex = canvasTexture(256, (ctx, s) => {
-    noisePaint(ctx, s, '#5a4638', 0.2, 5000);
+    noisePaint(ctx, s, '#8a7a68', 0.12, 4000);
   });
 
   return {
-    concrete: new THREE.MeshStandardMaterial({ map: concreteTex, roughness: 0.94, metalness: 0.02 }),
-    floor: new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.85, metalness: 0.1 }),
-    ceiling: new THREE.MeshStandardMaterial({ color: 0x3a3e3c, roughness: 0.95 }),
-    metal: new THREE.MeshStandardMaterial({ map: metalTex, roughness: 0.45, metalness: 0.75 }),
-    darkMetal: new THREE.MeshStandardMaterial({ color: 0x2b2f31, roughness: 0.5, metalness: 0.8 }),
-    rust: new THREE.MeshStandardMaterial({ map: rustTex, roughness: 0.9, metalness: 0.3 }),
-    warn: new THREE.MeshStandardMaterial({ color: 0xd9a521, roughness: 0.6 }),
-    glassy: new THREE.MeshPhysicalMaterial({ color: 0x9fc4c9, transmission: 0.7, roughness: 0.15, transparent: true, opacity: 0.55 }),
-    screenOff: new THREE.MeshStandardMaterial({ color: 0x0a0f0d, roughness: 0.3, metalness: 0.4 }),
+    concrete: new THREE.MeshStandardMaterial({ map: panelTex, roughness: 0.55, metalness: 0.02 }),
+    floor: new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.35, metalness: 0.06 }),
+    ceiling: new THREE.MeshStandardMaterial({ color: 0xf4f6f7, roughness: 0.9 }),
+    metal: new THREE.MeshStandardMaterial({ map: metalTex, roughness: 0.35, metalness: 0.7 }),
+    darkMetal: new THREE.MeshStandardMaterial({ color: 0x4b5257, roughness: 0.45, metalness: 0.75 }),
+    rust: new THREE.MeshStandardMaterial({ map: rustTex, roughness: 0.85, metalness: 0.25 }),
+    warn: new THREE.MeshStandardMaterial({ color: 0xe8b53a, roughness: 0.55 }),
+    glassy: new THREE.MeshPhysicalMaterial({ color: 0xbfe0e4, transmission: 0.7, roughness: 0.12, transparent: true, opacity: 0.45 }),
+    screenOff: new THREE.MeshStandardMaterial({ color: 0x1a2225, roughness: 0.3, metalness: 0.4 }),
   };
 }
 let M;
@@ -154,16 +151,17 @@ function textSign(text, w, h, color = '#35e0a1', bg = '#101614') {
   return m;
 }
 
-function ceilLight(x, y, z, { color = 0xeef2e9, intensity = 14, dist = 12, shadow = false, flicker = 0 } = {}) {
-  const fixture = box(0.9, 0.08, 0.24, M.darkMetal, x, y + 0.06, z, { solid: false, shadow: false });
+function ceilLight(x, y, z, { color = 0xffffff, intensity = 22, dist = 14, shadow = false } = {}) {
+  // dalle lumineuse encastrée, façon plafond de laboratoire
+  box(1.3, 0.06, 0.7, M.metal, x, y + 0.05, z, { solid: false, shadow: false });
   const pane = new THREE.Mesh(
-    new THREE.BoxGeometry(0.8, 0.03, 0.18),
-    new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: color, emissiveIntensity: 2.2 })
+    new THREE.BoxGeometry(1.2, 0.03, 0.6),
+    new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: color, emissiveIntensity: 2.6 })
   );
   pane.position.set(x, y, z);
   scene.add(pane);
-  const light = new THREE.PointLight(color, intensity, dist, 1.8);
-  light.position.set(x, y - 0.25, z);
+  const light = new THREE.PointLight(color, intensity, dist, 1.6);
+  light.position.set(x, y - 0.3, z);
   if (shadow) {
     light.castShadow = true;
     light.shadow.mapSize.set(512, 512);
@@ -171,14 +169,6 @@ function ceilLight(x, y, z, { color = 0xeef2e9, intensity = 14, dist = 12, shado
     light.shadow.normalBias = 0.08;
   }
   scene.add(light);
-  if (flicker > 0) {
-    const base = intensity;
-    animated.push((dt, t) => {
-      const f = Math.random() < flicker * 0.02 ? Math.random() * 0.15 : 1;
-      light.intensity += ((base * f) - light.intensity) * Math.min(1, dt * 30);
-      pane.material.emissiveIntensity = 0.4 + (light.intensity / base) * 1.8;
-    });
-  }
   return light;
 }
 
@@ -272,7 +262,7 @@ function buildCell() {
   const s = textSign('SUJET 23', 1.2, 0.4, '#8a8a8a', '#3f423f');
   s.position.set(0, 1.8, 1.98); s.rotation.y = Math.PI;
 
-  ceilLight(0, 2.95, 0, { intensity: 9, dist: 8, shadow: true, flicker: 1.2 });
+  ceilLight(0, 2.95, 0, { intensity: 18, dist: 10, shadow: true });
 }
 
 export function openVent() {
@@ -349,10 +339,11 @@ function buildCorridor() {
     camG.rotation.y = Math.sin(t * 0.6) * 0.7 + 0.4;
   });
 
-  ceilLight(0, 2.95, -5, { intensity: 10, dist: 9 });
-  ceilLight(0, 2.95, -10.5, { intensity: 10, dist: 9, flicker: 2.5 });
-  ceilLight(0, 2.95, -16, { intensity: 10, dist: 9, shadow: true });
-  ceilLight(0, 2.95, -20, { intensity: 7, dist: 7, color: 0xffe9d0 });
+  ceilLight(0, 2.95, -4.5, { intensity: 20, dist: 11 });
+  ceilLight(0, 2.95, -9, { intensity: 20, dist: 11 });
+  ceilLight(0, 2.95, -13.5, { intensity: 20, dist: 11 });
+  ceilLight(0, 2.95, -17.5, { intensity: 20, dist: 11, shadow: true });
+  ceilLight(0, 2.95, -20.3, { intensity: 14, dist: 9 });
 }
 
 export function disableSecuCam() {
@@ -517,10 +508,12 @@ function buildLab() {
   const cs = textSign('ACCÈS NIVEAU 4', 0.9, 0.25, '#ffb347', '#241a08');
   cs.position.set(-6.4, 2.25, -33.45);
 
-  ceilLight(-4, 3.55, -24, { intensity: 12, dist: 10 });
-  ceilLight(4, 3.55, -24, { intensity: 12, dist: 10, shadow: true });
-  ceilLight(-4, 3.55, -32, { intensity: 12, dist: 10, flicker: 2 });
-  ceilLight(4, 3.55, -32, { intensity: 12, dist: 10 });
+  ceilLight(-3.6, 3.55, -24, { intensity: 24, dist: 12 });
+  ceilLight(3.6, 3.55, -24, { intensity: 24, dist: 12, shadow: true });
+  ceilLight(-3.6, 3.55, -28, { intensity: 24, dist: 12 });
+  ceilLight(3.6, 3.55, -28, { intensity: 24, dist: 12 });
+  ceilLight(-3.6, 3.55, -32, { intensity: 24, dist: 12 });
+  ceilLight(3.6, 3.55, -32, { intensity: 24, dist: 12 });
 }
 
 export function extinguishFire() {
@@ -626,12 +619,13 @@ function buildServerRoom() {
   scene.add(screen);
   registerInteract('terminal_srv', term, 'Terminal de sécurité — session verrouillée', 2.6);
 
-  // éclairage d'urgence rouge tournant
-  const red = new THREE.PointLight(0xff3020, 9, 14, 1.6);
-  red.position.set(0, 3, -40.5);
-  scene.add(red);
-  animated.push((dt, t) => { red.intensity = 6.5 + Math.sin(t * 3.2) * 3; });
-  ceilLight(0, 3.35, -37, { intensity: 4, dist: 7, color: 0xff8866 });
+  // éclairage propre, avec un témoin rouge discret côté grille laser
+  ceilLight(0, 3.35, -37.5, { intensity: 22, dist: 12 });
+  ceilLight(0, 3.35, -43.5, { intensity: 22, dist: 12, shadow: true });
+  const statut = new THREE.PointLight(0xff4433, 4, 6, 2);
+  statut.position.set(0, 3, -41);
+  scene.add(statut);
+  animated.push((dt, t) => { statut.intensity = doors._lasers?.active ? 3.2 + Math.sin(t * 3.2) * 1.2 : 0; });
 }
 
 export function disableLasers() {
@@ -733,9 +727,11 @@ function buildHangar() {
   halo.position.set(0, 1.8, -60.5);
   scene.add(halo);
 
-  ceilLight(-3, 4.55, -53, { intensity: 13, dist: 11, flicker: 1.5 });
-  ceilLight(3, 4.55, -55, { intensity: 13, dist: 11, shadow: true });
-  ceilLight(0, 3.35, -48, { intensity: 8, dist: 8 });
+  ceilLight(-3, 4.55, -52, { intensity: 26, dist: 13 });
+  ceilLight(3, 4.55, -52, { intensity: 26, dist: 13, shadow: true });
+  ceilLight(-3, 4.55, -56, { intensity: 26, dist: 13 });
+  ceilLight(3, 4.55, -56, { intensity: 26, dist: 13 });
+  ceilLight(0, 3.35, -48, { intensity: 18, dist: 10 });
 }
 
 export function calmDog() {
@@ -777,7 +773,7 @@ function buildDust() {
   }
   geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   const dust = new THREE.Points(geo, new THREE.PointsMaterial({
-    color: 0xaabbb2, size: 0.02, transparent: true, opacity: 0.5, depthWrite: false,
+    color: 0xffffff, size: 0.015, transparent: true, opacity: 0.18, depthWrite: false,
   }));
   scene.add(dust);
   animated.push((dt, t) => {
@@ -798,10 +794,10 @@ export function buildWorld(sceneRef, camera) {
   scene = sceneRef;
   M = makeMaterials();
 
-  scene.fog = new THREE.FogExp2(0x05080a, 0.045);
-  scene.background = new THREE.Color(0x05080a);
-  scene.add(new THREE.AmbientLight(0x30383c, 0.7));
-  const hemi = new THREE.HemisphereLight(0x4a545a, 0x1c2018, 0.5);
+  scene.fog = new THREE.FogExp2(0xe2e7ea, 0.02);
+  scene.background = new THREE.Color(0xe2e7ea);
+  scene.add(new THREE.AmbientLight(0xffffff, 0.62));
+  const hemi = new THREE.HemisphereLight(0xffffff, 0x9aa4a8, 0.5);
   scene.add(hemi);
 
   buildCell();

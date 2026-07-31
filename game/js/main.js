@@ -22,7 +22,7 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.05;
+renderer.toneMappingExposure = 1.06;
 renderer.domElement.className = 'game';
 document.body.prepend(renderer.domElement);
 
@@ -52,11 +52,15 @@ const elMenu = $('menu'), elHud = $('hud'), elScanner = $('scanner'), elInv = $(
 const elBanner = $('chapter-banner'), elObjective = $('objective-text');
 const elPrompt = $('interact-prompt'), elSub = $('subtitles'), elNotif = $('notif-stack');
 const elHotbar = $('hotbar'), elFlash = $('damage-flash'), elEnding = $('ending');
+const elKeypad = $('keypad'), padDisplay = $('pad-display'), padHint = $('pad-hint'), padHack = $('pad-hack');
 
 let gameStarted = false;
 let scannerOpen = false;
 let invOpen = false;
+let keypadOpen = false;
 let subTimer = null;
+let padCode = '';
+let padOpts = null;
 
 const ui = {
   banner(title, sub) {
@@ -99,6 +103,18 @@ const ui = {
   },
   onHandsFree() { player.enabled = true; },
   refreshInventory() { renderHotbar(); renderInvGrid(); },
+  keypad(opts) {
+    padOpts = opts;
+    padCode = '';
+    padHint.textContent = opts.hint;
+    padDisplay.textContent = '····';
+    padDisplay.classList.remove('error');
+    padHack.disabled = !opts.canHack;
+    padHack.textContent = opts.hackLabel || 'PIRATER LE CLAVIER';
+    keypadOpen = true;
+    elKeypad.classList.remove('hidden');
+    document.exitPointerLock();
+  },
   ending(text) {
     document.exitPointerLock();
     $('ending-text').textContent = text;
@@ -228,6 +244,60 @@ function captureItem() {
 $('btn-capture').addEventListener('click', captureItem);
 $('btn-close-scan').addEventListener('click', toggleScanner);
 
+// ------------------------------------------------------------------
+// Clavier à code
+// ------------------------------------------------------------------
+function padPress(d) {
+  if (!keypadOpen || padCode.length >= 4) return;
+  padCode += d;
+  padDisplay.classList.remove('error');
+  padDisplay.textContent = padCode.padEnd(4, '·');
+}
+function padClear() {
+  padCode = '';
+  padDisplay.classList.remove('error');
+  padDisplay.textContent = '····';
+}
+function padValidate() {
+  if (!keypadOpen || padCode.length < 4) return;
+  if (padOpts.check(padCode)) {
+    closeKeypad();
+    padOpts.onSuccess(false);
+  } else {
+    padDisplay.classList.add('error');
+    padCode = '';
+    setTimeout(() => { if (keypadOpen) padDisplay.textContent = '····'; }, 450);
+    padOpts.onFail();
+  }
+}
+function padDoHack() {
+  if (!keypadOpen || padHack.disabled) return;
+  // le code s'extrait chiffre par chiffre de la mémoire du clavier
+  padHack.disabled = true;
+  const target = padOpts.answer;
+  let i = 0;
+  padCode = '';
+  const step = setInterval(() => {
+    padCode += target[i++];
+    padDisplay.textContent = padCode.padEnd(4, '·');
+    if (i >= 4) {
+      clearInterval(step);
+      setTimeout(() => { closeKeypad(); padOpts.onSuccess(true); }, 450);
+    }
+  }, 380);
+}
+function closeKeypad() {
+  keypadOpen = false;
+  elKeypad.classList.add('hidden');
+  player.requestLock();
+}
+document.querySelectorAll('.pad-grid button[data-d]').forEach((b) =>
+  b.addEventListener('click', () => padPress(b.dataset.d)));
+$('pad-clear').addEventListener('click', padClear);
+$('pad-ok').addEventListener('click', padValidate);
+$('pad-hack').addEventListener('click', padDoHack);
+$('pad-close').addEventListener('click', closeKeypad);
+
 function toggleInventory() {
   if (!gameStarted || state.finished) return;
   invOpen = !invOpen;
@@ -246,6 +316,13 @@ function toggleInventory() {
 document.addEventListener('keydown', (e) => {
   if (!gameStarted) return;
   resumeAudio();
+  if (keypadOpen) {
+    if (/^(Digit|Numpad)\d$/.test(e.code)) padPress(e.code.slice(-1));
+    else if (e.code === 'Backspace') padClear();
+    else if (e.code === 'Enter' || e.code === 'NumpadEnter') padValidate();
+    else if (e.code === 'Escape' || e.code === 'KeyE') closeKeypad();
+    return;
+  }
   switch (e.code) {
     case 'KeyC': toggleScanner(); break;
     case 'Enter': if (scannerOpen) captureItem(); break;
@@ -309,7 +386,7 @@ function loop() {
   const dt = Math.min(clock.getDelta(), 0.05);
   const t = clock.elapsedTime;
 
-  if (gameStarted && !scannerOpen && !invOpen) {
+  if (gameStarted && !scannerOpen && !invOpen && !keypadOpen) {
     player.update(dt);
     tick(dt, player);
   }

@@ -125,6 +125,11 @@ def main() -> None:
     GENERATED_DIR.mkdir(exist_ok=True)
     server = ThreadingHTTPServer(("0.0.0.0", port), GameHandler)
     print(f"NOVA-7 servi sur http://localhost:{port}")
+
+    # ouvre le navigateur automatiquement : il suffit de lancer `python serve.py`
+    import webbrowser
+
+    threading.Timer(0.8, lambda: webbrowser.open(f"http://localhost:{port}")).start()
     print(
         "Pont Tripo3D :",
         "ACTIF" if os.environ.get("TRIPO_API_KEY") else "inactif (TRIPO_API_KEY absent)",
