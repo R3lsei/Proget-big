@@ -254,7 +254,7 @@ document.addEventListener('keydown', (e) => {
     case 'KeyF': {
       if (findItemWithCap(state.inventory, 'eclairer')) {
         setFlashlight(!isFlashlightOn());
-      } else if (player.locked) {
+      } else if (player.locked || window.NOVA.debug) {
         ui.notify('🔦 Aucune source de lumière. Un <b>téléphone</b> ferait une lampe torche.', true);
       }
       break;

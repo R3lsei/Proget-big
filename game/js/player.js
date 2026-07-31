@@ -43,11 +43,36 @@ export class Player {
     document.addEventListener('pointerlockchange', () => {
       this.locked = document.pointerLockElement === this.dom;
     });
+    document.addEventListener('pointerlockerror', () => this.enableFallback());
 
     this.syncCamera();
   }
 
-  requestLock() { this.dom.requestPointerLock({ unadjustedMovement: true }).catch(() => this.dom.requestPointerLock()); }
+  requestLock() {
+    let p;
+    try {
+      p = this.dom.requestPointerLock({ unadjustedMovement: true });
+    } catch (_) { /* API sans options */ }
+    // Firefox renvoie undefined, Chrome une Promise qui peut rejeter
+    if (p && p.catch) p.catch(() => { try { this.dom.requestPointerLock(); } catch (_) {} });
+    setTimeout(() => { if (!this.locked) this.enableFallback(); }, 900);
+  }
+
+  /** Mode compatibilité : pointer lock indisponible (iframe, mobile…) →
+   *  on regarde en faisant glisser la souris, le jeu reste jouable. */
+  enableFallback() {
+    if (this.fallback) return;
+    this.fallback = true;
+    if (window.NOVA) window.NOVA.debug = true;
+    let drag = false;
+    this.dom.addEventListener('mousedown', () => { drag = true; });
+    window.addEventListener('mouseup', () => { drag = false; });
+    window.addEventListener('mousemove', (e) => {
+      if (!drag || this.locked) return;
+      this.yaw -= e.movementX * 0.0028;
+      this.pitch = Math.max(-1.45, Math.min(1.45, this.pitch - e.movementY * 0.0028));
+    });
+  }
 
   get forwardDir() {
     return new THREE.Vector3(-Math.sin(this.yaw), 0, -Math.cos(this.yaw));
