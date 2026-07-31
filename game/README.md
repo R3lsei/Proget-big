@@ -8,16 +8,27 @@ capacités logiques, et le matérialise dans votre inventaire pour résoudre les
 
 ## Lancer le jeu
 
-Deux façons de servir le jeu (la caméra exige `http://localhost` ou HTTPS) :
+**Le plus simple** — double-cliquez sur le lanceur à la racine du dépôt :
+
+- Windows : `JOUER-Windows.bat`
+- macOS / Linux : `JOUER-Mac-Linux.command`
+
+Il démarre le serveur local et ouvre le navigateur tout seul. Python suffit,
+aucune installation de dépendance n'est requise.
+
+> La caméra ne peut **pas** fonctionner en ouvrant `index.html` par
+> double-clic : les navigateurs bloquent la webcam sur les URL `file://`.
+> C'est pourquoi un petit serveur local est nécessaire — le lanceur s'en charge.
+
+En ligne de commande, ou pour activer le pont Tripo3D :
 
 ```bash
-# Recommandé : avec le pont Tripo3D (objets scannés → vrais modèles 3D en jeu)
-pip install -r requirements.txt   # une fois, à la racine du dépôt
-python serve.py                   # TRIPO_API_KEY dans .env pour activer le pont
+python serve.py                   # sert le jeu + ouvre le navigateur
+pip install -r requirements.txt   # facultatif : active le pont Tripo3D
+                                  # (avec TRIPO_API_KEY dans .env)
 
-# Ou en statique pur (le jeu complet fonctionne aussi comme ça)
-cd game && python3 -m http.server 8000
-# puis ouvrir http://localhost:8000 dans Chrome / Edge / Firefox
+# Alternative sans serve.py :
+cd game && python3 -m http.server 8000   # puis http://localhost:8000
 ```
 
 Autorisez l'accès à la caméra quand le navigateur le demande. Au premier
