@@ -4,6 +4,10 @@ A small hub for connecting Claude/CLI workflows to external software, built one
 integration at a time. First integration: **Tripo3D** (AI text-to-3D and
 image-to-3D generation).
 
+Also in this repo: **[NOVA-7 : Protocole Évasion](game/README.md)** — a
+browser FPS escape game where real objects shown to your webcam are detected
+(COCO-SSD) and materialized as usable in-game items. See `game/README.md`.
+
 ## Setup
 
 ```bash
