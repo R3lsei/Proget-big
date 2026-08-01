@@ -1,8 +1,8 @@
 # Proget-big — Software Integrations Hub
 
 A small hub for connecting Claude/CLI workflows to external software, built one
-integration at a time. First integration: **Tripo3D** (AI text-to-3D and
-image-to-3D generation).
+integration at a time. Integrations so far: **Tripo3D** (AI text-to-3D and
+image-to-3D generation) and **ElevenLabs** (text-to-speech).
 
 Also in this repo: **[NOVA-7 : Protocole Évasion](game/README.md)** — a
 browser FPS escape game where real objects shown to your webcam are detected
@@ -29,6 +29,12 @@ python cli.py tripo text "a low-poly red fox" --output ./output
 
 # Generate a 3D model from an image
 python cli.py tripo image ./cat.png --output ./output
+
+# List ElevenLabs voices, then voice the NOVA-7 game dialogue
+python cli.py elevenlabs list
+python cli.py elevenlabs voices --dry-run   # preview, spends no credits
+python cli.py elevenlabs voices             # writes game/voices/*.mp3
+python cli.py elevenlabs say "Bonjour" --output ./output
 ```
 
 Generated files (`.glb` model, and PBR variant when available) are downloaded

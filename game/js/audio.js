@@ -180,7 +180,41 @@ function thud(freq, dur, at = null) {
   o.start(t); o.stop(t + dur + 0.05);
 }
 
-// ---------- voix de synthèse ----------
+// ---------- voix ----------
+// Une réplique doublée par ElevenLabs (voices/<id>.mp3) est jouée si elle
+// existe ; sinon on retombe sur la synthèse du navigateur. Le jeu reste donc
+// entièrement jouable sans avoir généré la moindre voix.
+
+/** Identifiant de fichier d'une réplique — FNV-1a, identique côté Python
+ *  (integrations/elevenlabs/client.py). Doit rester synchrone : c'est ce qui
+ *  interdit crypto.subtle, asynchrone par nature. */
+export function lineId(text) {
+  let h = 0x811c9dc5;
+  const bytes = new TextEncoder().encode(text.trim());
+  for (const b of bytes) {
+    h ^= b;
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return h.toString(16).padStart(8, '0');
+}
+
+let voiceManifest = null;   // Set des ids disponibles, ou null si non chargé
+let currentVoice = null;    // HTMLAudioElement en cours
+export const spokenLines = []; // journal, pour générer les voix manquantes
+
+/** Charge voices/manifest.json s'il existe. Sans lui, tout passe en synthèse. */
+export async function loadVoiceManifest() {
+  try {
+    const res = await fetch('voices/manifest.json', { cache: 'no-cache' });
+    if (!res.ok) return false;
+    const data = await res.json();
+    voiceManifest = new Set(Object.values(data.lines || {}));
+    return voiceManifest.size > 0;
+  } catch (_) {
+    return false;
+  }
+}
+
 let frVoice = undefined;
 function pickVoice() {
   if (frVoice !== undefined) return frVoice;
@@ -193,6 +227,23 @@ if ('speechSynthesis' in window) {
 }
 
 export function speak(text, { rate = 1.02, pitch = 0.85 } = {}) {
+  if (!spokenLines.includes(text)) spokenLines.push(text);
+
+  const id = lineId(text);
+  if (voiceManifest && voiceManifest.has(id + '.mp3')) {
+    if ('speechSynthesis' in window) speechSynthesis.cancel();
+    if (currentVoice) { currentVoice.pause(); currentVoice = null; }
+    const el = new Audio(`voices/${id}.mp3`);
+    el.volume = 0.95;
+    currentVoice = el;
+    // si le fichier est illisible, on ne laisse pas la réplique muette
+    el.play().catch(() => browserSpeak(text, rate, pitch));
+    return;
+  }
+  browserSpeak(text, rate, pitch);
+}
+
+function browserSpeak(text, rate, pitch) {
   if (!('speechSynthesis' in window)) return;
   speechSynthesis.cancel();
   const u = new SpeechSynthesisUtterance(text);

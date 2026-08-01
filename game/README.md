@@ -109,6 +109,39 @@ game/
 ../serve.py         serveur de dev : sert game/ + POST /api/tripo3d
 ```
 
+## Voix ElevenLabs (optionnel)
+
+Par défaut, le Dr Lenoir parle avec la synthèse vocale du navigateur — correcte,
+mais robotique. Pour un vrai doublage :
+
+```bash
+pip install -r requirements.txt
+# ELEVENLABS_API_KEY dans .env (https://elevenlabs.io/app/settings/api-keys)
+
+python cli.py elevenlabs list          # choisir une voix -> ELEVENLABS_VOICE_ID
+python cli.py elevenlabs voices --dry-run   # voir les 74 répliques, sans dépenser
+python cli.py elevenlabs voices        # génère game/voices/*.mp3 + manifest.json
+```
+
+Les fichiers sont mis en cache : relancer la commande ne re-synthétise que les
+répliques nouvelles ou modifiées. Le jeu charge `voices/manifest.json` au
+démarrage et **retombe sur la synthèse du navigateur pour toute réplique
+absente** — il reste donc jouable sans clé API.
+
+La clé n'est jamais exposée au navigateur : la synthèse a lieu à la génération,
+le jeu ne lit que des `.mp3`. Les voix générées sont git-ignorées (elles
+dépendent de votre clé et de la voix choisie) ; pour distribuer le jeu doublé,
+forcez leur ajout avec `git add -f game/voices/`.
+
+Une réplique oubliée ? Jouez une partie, puis dans la console du navigateur :
+
+```js
+NOVA.spokenLines()      // copiez le JSON dans lignes.json
+```
+```bash
+python cli.py elevenlabs voices --from-json lignes.json
+```
+
 ## Pont Tripo3D (optionnel)
 
 Servi par `python serve.py` avec une `TRIPO_API_KEY` (voir la racine du dépôt),

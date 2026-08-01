@@ -5,3 +5,6 @@ __pycache__/
 venv/
 output/
 game/generated/
+# Voix générées : elles dépendent de votre clé et de la voix choisie.
+# Pour distribuer le jeu doublé : git add -f game/voices/
+game/voices/

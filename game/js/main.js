@@ -10,7 +10,7 @@ import { RoomEnvironment } from '../lib/RoomEnvironment.js';
 import { requestRealModel } from './tripo.js';
 import { Player } from './player.js';
 import { loadModel, openScanner, closeScanner, captureStableObject, onDetectionAnnounce } from './vision.js';
-import { initAudio, resumeAudio, speak, sfxScan } from './audio.js';
+import { initAudio, resumeAudio, speak, sfxScan, loadVoiceManifest, spokenLines } from './audio.js';
 import { bindUI, beginGame, materializeItem, interact, tick, state } from './story.js';
 import { findItemWithCap, CAPS } from './items.js';
 
@@ -49,6 +49,9 @@ const player = new Player(camera, renderer.domElement);
 // Console de développement : NOVA.debug = true permet de jouer sans pointer lock.
 window.NOVA = {
   player, state, colliders, debug: false,
+  // Répliques prononcées cette partie : copiez-les pour générer les voix
+  // manquantes (voir python cli.py elevenlabs voices --from-json).
+  spokenLines: () => JSON.stringify(spokenLines, null, 2),
   world: { getSecuCamActive, getFireActive, getLasersActive, getDogCalm, getSteamActive },
 };
 
@@ -176,6 +179,10 @@ function renderInvGrid() {
 // ------------------------------------------------------------------
 const btnStart = $('btn-start');
 const loadStatus = $('load-status');
+
+loadVoiceManifest().then((ok) => {
+  if (ok) console.info('[NOVA-7] Voix ElevenLabs chargées.');
+});
 
 loadModel((s) => (loadStatus.textContent = s))
   .then(() => {
