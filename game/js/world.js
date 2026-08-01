@@ -205,6 +205,10 @@ function slidingDoor(id, x, z, { width = 1.5, height = 2.3, ry = 0, mat = null, 
   g.position.set(x, 0, z);
   g.rotation.y = ry;
   scene.add(g);
+  // setFromObject ne recalcule pas la matrice du parent : sans cette mise à
+  // jour, le collider du panneau reste à l'origine du monde (mur invisible
+  // au milieu de la cellule de départ, et portes qui ne bloquent rien).
+  g.updateMatrixWorld(true);
   const collider = new THREE.Box3().setFromObject(panel);
   colliders.push(collider);
   doors[id] = { group: g, panel, lamp, collider, open: false, height };

@@ -17,6 +17,7 @@ export class Player {
     this.camera = camera;
     this.dom = dom;
     this.position = new THREE.Vector3(0, 0, 0.9); // pieds, dans la cellule
+    this.lastSafe = this.position.clone();
     this.velocity = new THREE.Vector3();
     this.yaw = Math.PI;      // regarde le mur du fond au réveil
     this.pitch = 0;
@@ -105,9 +106,20 @@ export class Player {
     this.velocity.y -= GRAVITY * dt;
 
     // déplacement axe par axe avec résolution de collision
-    this.tryMove(move.x * dt, 0, 0);
-    this.tryMove(0, 0, move.z * dt);
-    this.tryMove(0, this.velocity.y * dt, 0);
+    this.moveAxis('x', move.x * dt);
+    this.moveAxis('z', move.z * dt);
+    this.moveAxis('y', this.velocity.y * dt);
+
+    // filet de sécurité : le complexe tient dans ces limites. Si le joueur en
+    // sort malgré tout, on le ramène à sa dernière position valide plutôt que
+    // de le laisser flotter hors du décor.
+    const p = this.position;
+    if (p.x < -8.5 || p.x > 8.5 || p.z > 3.5 || p.z < -62 || p.y < -1 || p.y > 7) {
+      p.copy(this.lastSafe);
+      this.velocity.set(0, 0, 0);
+    } else if (this.onGround) {
+      this.lastSafe.copy(p);
+    }
 
     // sol
     if (this.position.y <= 0) {
@@ -137,29 +149,39 @@ export class Player {
     this.syncCamera();
   }
 
-  tryMove(dx, dy, dz) {
-    this.position.x += dx;
-    this.position.y += dy;
-    this.position.z += dz;
+  /** Déplace le joueur sur UN SEUL axe et résout les collisions sur ce même axe.
+   *  Le joueur est toujours repoussé du côté d'où il vient : jamais à travers
+   *  l'obstacle. Les déplacements infimes sont ignorés — sans ce seuil, un
+   *  résidu de virgule flottante (Math.sin(Math.PI) ≈ 1.2e-16) suffisait à
+   *  déclencher une correction latérale et à éjecter le joueur hors du décor. */
+  moveAxis(axis, amount) {
+    if (!Number.isFinite(amount) || Math.abs(amount) < 1e-6) return;
+
+    const feetBefore = this.position.y;
+    this.position[axis] += amount;
     const pbox = this.bbox();
+
     for (const c of colliders) {
       if (!pbox.intersectsBox(c)) continue;
-      if (dx > 0) this.position.x = c.min.x - RADIUS;
-      else if (dx < 0) this.position.x = c.max.x + RADIUS;
-      if (dz > 0) this.position.z = c.min.z - RADIUS;
-      else if (dz < 0) this.position.z = c.max.z + RADIUS;
-      if (dy < 0 && c.max.y < 1.3) { // atterrit sur un obstacle bas
-        this.position.y = c.max.y + 0.002;
-        this.velocity.y = 0;
-        this.onGround = true;
-      } else if (dy > 0) {
-        this.velocity.y = 0;
-        this.position.y = c.min.y - HEIGHT;
+
+      if (axis === 'y') {
+        if (amount < 0) {
+          // on ne se pose que sur une surface qui était sous nos pieds
+          if (c.max.y > feetBefore + 0.02) continue;
+          this.position.y = c.max.y + 0.002;
+          this.velocity.y = 0;
+          this.onGround = true;
+        } else {
+          this.position.y = c.min.y - HEIGHT - 0.002;
+          this.velocity.y = 0;
+        }
+      } else if (amount > 0) {
+        this.position[axis] = c.min[axis] - RADIUS - 0.002;
+      } else {
+        this.position[axis] = c.max[axis] + RADIUS + 0.002;
       }
-      pbox.setFromCenterAndSize(
-        new THREE.Vector3(this.position.x, this.position.y + HEIGHT / 2, this.position.z),
-        new THREE.Vector3(RADIUS * 2, HEIGHT, RADIUS * 2)
-      );
+
+      pbox.copy(this.bbox());
     }
   }
 
@@ -183,10 +205,10 @@ export class Player {
     this.camera.rotation.x = this.pitch;
   }
 
-  /** Repousse le joueur (laser, chien) */
+  /** Repousse le joueur (feu, laser, vapeur, chien) */
   pushBack(strength = 3) {
     const back = this.forwardDir.multiplyScalar(-strength);
-    this.tryMove(back.x * 0.1, 0, 0);
-    this.tryMove(0, 0, back.z * 0.1);
+    this.moveAxis('x', back.x * 0.1);
+    this.moveAxis('z', back.z * 0.1);
   }
 }

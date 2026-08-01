@@ -2,7 +2,7 @@
 
 import * as THREE from 'three';
 import {
-  buildWorld, updateWorld, interactables, setFlashlight, isFlashlightOn,
+  buildWorld, updateWorld, interactables, colliders, setFlashlight, isFlashlightOn,
   getSecuCamActive, getFireActive, getLasersActive, getDogCalm, getSteamActive,
   spawnGeneratedProp,
 } from './world.js';
@@ -40,7 +40,7 @@ const player = new Player(camera, renderer.domElement);
 
 // Console de développement : NOVA.debug = true permet de jouer sans pointer lock.
 window.NOVA = {
-  player, state, debug: false,
+  player, state, colliders, debug: false,
   world: { getSecuCamActive, getFireActive, getLasersActive, getDogCalm, getSteamActive },
 };
 
