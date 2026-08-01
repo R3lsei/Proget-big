@@ -6,6 +6,7 @@ import {
   getSecuCamActive, getFireActive, getLasersActive, getDogCalm, getSteamActive,
   spawnGeneratedProp,
 } from './world.js';
+import { RoomEnvironment } from '../lib/RoomEnvironment.js';
 import { requestRealModel } from './tripo.js';
 import { Player } from './player.js';
 import { loadModel, openScanner, closeScanner, captureStableObject, onDetectionAnnounce } from './vision.js';
@@ -28,6 +29,13 @@ document.body.prepend(renderer.domElement);
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(72, window.innerWidth / window.innerHeight, 0.05, 120);
+
+// Éclairage par image d'environnement : les reflets sur l'inox, le chrome et
+// la verrerie viennent d'une vraie carte d'irradiance, pas d'un simple ambient.
+// C'est ce qui distingue une surface métallique d'un aplat gris.
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+pmrem.dispose();
 
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
@@ -390,7 +398,7 @@ function loop() {
     player.update(dt);
     tick(dt, player);
   }
-  updateWorld(dt, t);
+  updateWorld(dt, t, player.position);
   updateInteractPrompt();
   renderer.render(scene, camera);
 }

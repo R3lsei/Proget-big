@@ -3,6 +3,51 @@
 
 import * as THREE from 'three';
 import { GLTFLoader } from '../lib/GLTFLoader.js';
+import {
+  initProps, roundedBox, beaker, testTubeRack, microscope, labBench, labStool,
+  terminal, serverRack, crate, drum, pipeRun, securityCamera, badgeReader,
+  sink, cot, cabinet, badge, vent as ventGrille, guardDog, trolley,
+} from './props.js';
+
+/** Plinthe sombre au pied d'un mur : casse le blanc et ancre la pièce. */
+function skirting(x, z, length, { horizontal = false } = {}) {
+  const mat = new THREE.MeshStandardMaterial({ color: 0x46525a, roughness: 0.5, metalness: 0.25 });
+  const m = new THREE.Mesh(
+    horizontal ? new THREE.BoxGeometry(length, 0.12, 0.05) : new THREE.BoxGeometry(0.05, 0.12, length),
+    mat
+  );
+  m.position.set(x, 0.06, z);
+  m.receiveShadow = true;
+  scene.add(m);
+  return m;
+}
+
+/** Bande de guidage colorée au sol : repère visuel et respiration graphique. */
+function floorStripe(x, z, length, color = 0x2fb98a, width = 0.16) {
+  const m = new THREE.Mesh(
+    new THREE.PlaneGeometry(width, length),
+    new THREE.MeshStandardMaterial({ color, roughness: 0.4, metalness: 0.1, envMapIntensity: 0.4 })
+  );
+  m.rotation.x = -Math.PI / 2;
+  m.position.set(x, 0.003, z);
+  m.receiveShadow = true;
+  scene.add(m);
+  return m;
+}
+
+/** Pose un groupe de props dans la scène, avec collider optionnel. */
+function place(group, x, y, z, { ry = 0, solid = false, scale = 1 } = {}) {
+  group.position.set(x, y, z);
+  group.rotation.y = ry;
+  if (scale !== 1) group.scale.setScalar(scale);
+  group.traverse((n) => { if (n.isMesh) { n.castShadow = true; n.receiveShadow = true; } });
+  scene.add(group);
+  if (solid) {
+    group.updateMatrixWorld(true);
+    colliders.push(new THREE.Box3().setFromObject(group));
+  }
+  return group;
+}
 
 export const colliders = [];        // THREE.Box3 solides
 export const interactables = [];    // { id, mesh, label, dist }
@@ -55,10 +100,10 @@ function makeMaterials() {
     ctx.fillRect(0, 0, s, s);
   }, [2, 1]);
 
-  // sol : grands carreaux clairs légèrement satinés
+  // sol : grands carreaux clairs légèrement satinés, joints marqués
   const floorTex = canvasTexture(512, (ctx, s) => {
-    noisePaint(ctx, s, '#d4d9db', 0.05, 4000);
-    ctx.strokeStyle = 'rgba(120,130,135,0.5)';
+    noisePaint(ctx, s, '#b9c1c4', 0.06, 4000);
+    ctx.strokeStyle = 'rgba(90,100,106,0.65)';
     ctx.lineWidth = 3;
     const step = s / 4;
     for (let i = 0; i <= 4; i++) {
@@ -78,9 +123,11 @@ function makeMaterials() {
   });
 
   return {
-    concrete: new THREE.MeshStandardMaterial({ map: panelTex, roughness: 0.55, metalness: 0.02 }),
-    floor: new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.35, metalness: 0.06 }),
-    ceiling: new THREE.MeshStandardMaterial({ color: 0xf4f6f7, roughness: 0.9 }),
+    // envMapIntensity faible sur les grandes surfaces mates : le reflet
+    // d'environnement doit servir le métal et le verre, pas délaver les murs.
+    concrete: new THREE.MeshStandardMaterial({ map: panelTex, roughness: 0.6, metalness: 0.02, envMapIntensity: 0.35 }),
+    floor: new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.32, metalness: 0.06, envMapIntensity: 0.5 }),
+    ceiling: new THREE.MeshStandardMaterial({ color: 0xe8ecee, roughness: 0.92, envMapIntensity: 0.25 }),
     metal: new THREE.MeshStandardMaterial({ map: metalTex, roughness: 0.35, metalness: 0.7 }),
     darkMetal: new THREE.MeshStandardMaterial({ color: 0x4b5257, roughness: 0.45, metalness: 0.75 }),
     rust: new THREE.MeshStandardMaterial({ map: rustTex, roughness: 0.85, metalness: 0.25 }),
@@ -151,25 +198,57 @@ function textSign(text, w, h, color = '#35e0a1', bg = '#101614') {
   return m;
 }
 
-function ceilLight(x, y, z, { color = 0xffffff, intensity = 22, dist = 14, shadow = false } = {}) {
+// Chaque plafonnier est un « point lumineux » déclaré, pas une PointLight :
+// le rendu forward de three évalue TOUTES les lumières sur TOUS les matériaux.
+// Un pool de lumières réelles suit le joueur et se réaffecte aux luminaires les
+// plus proches — coût de shader constant, quel que soit le nombre de dalles.
+const lightSpots = [];
+const LIGHT_POOL_SIZE = 6;
+const lightPool = [];
+
+function ceilLight(x, y, z, { color = 0xffffff, intensity = 11, dist = 14, shadow = false } = {}) {
   // dalle lumineuse encastrée, façon plafond de laboratoire
   box(1.3, 0.06, 0.7, M.metal, x, y + 0.05, z, { solid: false, shadow: false });
   const pane = new THREE.Mesh(
     new THREE.BoxGeometry(1.2, 0.03, 0.6),
-    new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: color, emissiveIntensity: 2.6 })
+    new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: color, emissiveIntensity: 1.35 })
   );
   pane.position.set(x, y, z);
   scene.add(pane);
-  const light = new THREE.PointLight(color, intensity, dist, 1.6);
-  light.position.set(x, y - 0.3, z);
-  if (shadow) {
-    light.castShadow = true;
-    light.shadow.mapSize.set(512, 512);
-    light.shadow.bias = -0.0006;
-    light.shadow.normalBias = 0.08;
+  lightSpots.push({ pos: new THREE.Vector3(x, y - 0.3, z), color, intensity, dist, shadow });
+}
+
+function buildLightPool() {
+  for (let i = 0; i < LIGHT_POOL_SIZE; i++) {
+    const l = new THREE.PointLight(0xffffff, 0, 14, 1.6);
+    if (i < 2) { // seules les deux plus proches projettent des ombres
+      l.castShadow = true;
+      l.shadow.mapSize.set(768, 768);
+      l.shadow.bias = -0.0006;
+      l.shadow.normalBias = 0.08;
+      l.shadow.camera.far = 18;
+    }
+    scene.add(l);
+    lightPool.push(l);
   }
-  scene.add(light);
-  return light;
+}
+
+/** Réaffecte le pool aux luminaires les plus proches du joueur. */
+function updateLightPool(playerPos) {
+  if (!lightPool.length || !playerPos) return;
+  const near = lightSpots
+    .map((s) => ({ s, d: s.pos.distanceToSquared(playerPos) }))
+    .sort((a, b) => a.d - b.d)
+    .slice(0, LIGHT_POOL_SIZE);
+  for (let i = 0; i < lightPool.length; i++) {
+    const l = lightPool[i];
+    const hit = near[i];
+    if (!hit) { l.intensity = 0; continue; }
+    l.position.copy(hit.s.pos);
+    l.color.set(hit.s.color);
+    l.distance = hit.s.dist;
+    l.intensity = hit.s.intensity;
+  }
 }
 
 function registerInteract(id, mesh, label, dist = 2.6) {
@@ -250,23 +329,20 @@ function buildCell() {
 
   slidingDoor('porte_cellule', 0, -2.15, { label: 'Porte de cellule — serrure mécanique' });
 
-  // lit de camp
-  box(0.9, 0.32, 2, M.rust, -1.55, 0.16, 0.8);
-  box(0.86, 0.1, 1.9, new THREE.MeshStandardMaterial({ color: 0x4a5a52, roughness: 1 }), -1.55, 0.38, 0.8, { solid: false });
-  // lavabo + toilettes
-  box(0.5, 0.5, 0.4, M.metal, 1.75, 0.7, 1.6);
-  box(0.45, 0.45, 0.45, M.metal, 1.75, 0.25, 0.6);
-  // grille d'aération (mur est, près du sol) → conduit vers le couloir
-  const vent = box(0.06, 0.8, 1.1, M.darkMetal, 2.12, 0.55, -1.2, { solid: false });
-  vent.material = new THREE.MeshStandardMaterial({ color: 0x1d2422, roughness: 0.6, metalness: 0.7 });
-  registerInteract('grille_cellule', vent, 'Grille d\'aération — scellée', 2.2);
-  doors._vent = vent;
+  // lit de camp, lavabo : props modélisés (cadre tubulaire, robinet col-de-cygne…)
+  place(cot(), -1.5, 0, 0.7, { ry: 0, solid: true });
+  place(sink(), 1.72, 0, 1.5, { ry: -Math.PI / 2, solid: true });
+
+  // grille d'aération à lames (mur est, près du sol) → conduit vers le couloir
+  const grille = place(ventGrille(0.75, 0.85), 2.0, 0.62, -1.2, { ry: -Math.PI / 2 });
+  registerInteract('grille_cellule', grille.children[0], 'Grille d\'aération — scellée', 2.4);
+  doors._vent = grille;
 
   // inscriptions de l'ancien occupant
   const s = textSign('SUJET 23', 1.2, 0.4, '#8a8a8a', '#3f423f');
   s.position.set(0, 1.8, 1.98); s.rotation.y = Math.PI;
 
-  ceilLight(0, 2.95, 0, { intensity: 18, dist: 10, shadow: true });
+  ceilLight(0, 2.95, 0, { intensity: 9, dist: 10, shadow: true });
 }
 
 export function openVent() {
@@ -276,8 +352,8 @@ export function openVent() {
   animated.push((dt) => {
     if (p >= 1) return;
     p = Math.min(1, p + dt * 1.2);
-    v.rotation.z = -easeInOut(p) * 1.4;
-    v.position.y = 0.55 - easeInOut(p) * 0.25;
+    v.rotation.z = -easeInOut(p) * 1.4;    // la grille bascule sur ses gonds
+    v.position.y = 0.62 - easeInOut(p) * 0.28;
   });
   setInteractLabel('grille_cellule', 'Conduit d\'aération ouvert');
 }
@@ -306,48 +382,60 @@ function buildCorridor() {
     }
   }
 
-  // tuyauterie au plafond
-  for (const px of [-1.2, -0.9]) {
-    const pipe = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, L - 1.2, 10), M.rust);
-    pipe.rotation.x = Math.PI / 2;
-    pipe.position.set(px, 2.8, zc - 0.3);
-    scene.add(pipe);
+  // plinthes + bandes de guidage : le couloir cesse d'être un tunnel blanc
+  for (const sx of [-1.48, 1.48]) skirting(sx, zc, L);
+  floorStripe(-0.55, zc, L, 0x2fb98a);
+  floorStripe(0.55, zc, L, 0xd8a828);
+
+  // tuyauterie au plafond, avec colliers de fixation
+  const P = initProps();
+  for (const [px, r, mat] of [[-1.25, 0.07, P.steel], [-0.98, 0.05, P.steel], [1.3, 0.045, M.warn]]) {
+    const run = pipeRun(L - 1.2, r, mat);
+    place(run, px, 2.78, zc - 0.3);
   }
 
   // panneau de bloc
   const sign = textSign('BLOC DE DÉTENTION A', 2.2, 0.5);
   sign.position.set(0, 2.5, -3.2); sign.rotation.y = 0;
 
-  // casier du gardien (secret optionnel : un peu d'histoire)
-  const locker = box(0.55, 1.7, 0.45, M.darkMetal, 1.32, 0.85, -8.2);
-  registerInteract('casier', locker, 'Casier du gardien — cadenassé', 2.4);
+  // chariots abandonnés : le couloir respire
+  place(trolley(), -1.05, 0, -6.4, { ry: 0.3, solid: true });
+  place(trolley(), 1.0, 0, -14.2, { ry: -0.5, solid: true });
 
-  // caméra de surveillance (plafond, avant la porte codée)
-  const camG = new THREE.Group();
-  const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.3, 8), M.darkMetal);
-  arm.position.y = 0.15;
-  const body = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.14, 0.34), M.darkMetal);
-  const lens = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.045, 0.05, 0.05, 12),
-    new THREE.MeshStandardMaterial({ color: 0x111111, emissive: 0xff2222, emissiveIntensity: 2 })
-  );
-  lens.rotation.x = Math.PI / 2;
-  lens.position.z = -0.19;
-  camG.add(arm, body, lens);
-  camG.position.set(1.1, 2.75, -17.5);
-  scene.add(camG);
-  registerInteract('cam_secu', body, 'Caméra de surveillance', 3.2);
-  doors._secucam = { group: camG, lens, active: true };
+  // casier du gardien (secret optionnel : un peu d'histoire)
+  const locker = new THREE.Group();
+  const lockerBody = new THREE.Mesh(roundedBox(0.58, 1.75, 0.45, 0.012), M.metal);
+  lockerBody.position.y = 0.875;
+  locker.add(lockerBody);
+  for (let i = 0; i < 4; i++) { // fentes d'aération en haut de porte
+    const slot = new THREE.Mesh(roundedBox(0.3, 0.014, 0.01, 0.004), M.darkMetal);
+    slot.position.set(0, 1.5 + i * 0.045, 0.228);
+    locker.add(slot);
+  }
+  const hasp = new THREE.Mesh(new THREE.TorusGeometry(0.038, 0.009, 8, 16, Math.PI), P.chrome);
+  hasp.position.set(0.17, 0.98, 0.245);
+  locker.add(hasp);
+  const padlock = new THREE.Mesh(roundedBox(0.055, 0.07, 0.022, 0.012), P.darkSteel);
+  padlock.position.set(0.17, 0.925, 0.25);
+  locker.add(padlock);
+  place(locker, 1.3, 0, -8.2, { ry: -Math.PI / 2, solid: true });
+  registerInteract('casier', lockerBody, 'Casier du gardien — cadenassé', 2.4);
+
+  // caméra de surveillance sur rotule (plafond, avant la porte codée)
+  const cam = place(securityCamera(), 1.1, 2.92, -17.5);
+  const head = cam.userData.head;
+  registerInteract('cam_secu', head.children[0], 'Caméra de surveillance', 3.4);
+  doors._secucam = { group: cam, head, lens: cam.userData.led, active: true };
   animated.push((dt, t) => {
     if (!doors._secucam.active) return;
-    camG.rotation.y = Math.sin(t * 0.6) * 0.7 + 0.4;
+    head.rotation.y = Math.sin(t * 0.6) * 0.7 + 0.4;
   });
 
-  ceilLight(0, 2.95, -4.5, { intensity: 20, dist: 11 });
-  ceilLight(0, 2.95, -9, { intensity: 20, dist: 11 });
-  ceilLight(0, 2.95, -13.5, { intensity: 20, dist: 11 });
-  ceilLight(0, 2.95, -17.5, { intensity: 20, dist: 11, shadow: true });
-  ceilLight(0, 2.95, -20.3, { intensity: 14, dist: 9 });
+  ceilLight(0, 2.95, -4.5, { intensity: 10, dist: 11 });
+  ceilLight(0, 2.95, -9, { intensity: 10, dist: 11 });
+  ceilLight(0, 2.95, -13.5, { intensity: 10, dist: 11 });
+  ceilLight(0, 2.95, -17.5, { intensity: 10, dist: 11, shadow: true });
+  ceilLight(0, 2.95, -20.3, { intensity: 7, dist: 9 });
 }
 
 export function disableSecuCam() {
@@ -357,10 +445,10 @@ export function disableSecuCam() {
   c.lens.material.emissive.set(0x111111);
   c.lens.material.emissiveIntensity = 0;
   let p = 0;
-  animated.push((dt) => { // la caméra retombe, inerte
+  animated.push((dt) => { // la tête retombe, inerte
     if (p >= 1) return;
     p = Math.min(1, p + dt * 2);
-    c.group.rotation.x = easeInOut(p) * 0.9;
+    c.head.rotation.x = easeInOut(p) * 0.9;
   });
   setInteractEnabled('cam_secu', false);
 }
@@ -426,16 +514,25 @@ function buildLab() {
   const sign = textSign('LABORATOIRE 3 — BIOCONTRÔLE', 3.2, 0.55);
   sign.position.set(0, 2.9, -21.32); sign.rotation.y = Math.PI;
 
-  // paillasses avec verrerie
+  // plinthes périmétriques + marquage au sol de la zone de sécurité
+  for (const sx of [-6.98, 6.98]) skirting(sx, -28, 14);
+  for (const sz of [-21.0, -35.0]) skirting(0, sz, 14, { horizontal: true });
+  for (const sx of [-2.3, 2.3]) floorStripe(sx, -28, 13.6, 0xd8a828, 0.12);
+
+  // paillasses équipées : verrerie, portoirs à tubes, microscopes, tabourets
   for (const [bx, bz, bw] of [[-4, -24.5, 4.5], [4, -24.5, 4.5], [-4, -31.5, 4.5], [4, -31.5, 4.5]]) {
-    box(bw, 0.9, 1.4, M.metal, bx, 0.45, bz);
-    box(bw, 0.06, 1.5, new THREE.MeshStandardMaterial({ color: 0xdadfdd, roughness: 0.25, metalness: 0.1 }), bx, 0.93, bz, { solid: false });
-    for (let i = 0; i < 5; i++) {
-      const r = 0.05 + Math.random() * 0.06;
-      const flask = new THREE.Mesh(new THREE.CylinderGeometry(r, r * 1.3, 0.18 + Math.random() * 0.2, 10), M.glassy);
-      flask.position.set(bx - bw / 2 + 0.4 + Math.random() * (bw - 0.8), 1.08, bz + (Math.random() - 0.5) * 0.9);
-      scene.add(flask);
+    place(labBench(bw, 0.78, 0.9), bx, 0, bz, { solid: true });
+    const top = 0.94;
+    for (let i = 0; i < 4; i++) {
+      const x = bx - bw / 2 + 0.5 + Math.random() * (bw - 1.0);
+      const z = bz + (Math.random() - 0.5) * 0.4;
+      place(beaker(0.12 + Math.random() * 0.09, 0.04 + Math.random() * 0.025), x, top, z,
+        { ry: Math.random() * 3 });
     }
+    place(testTubeRack(5), bx + bw * 0.28, top, bz - 0.16, { ry: 0.1 });
+    place(microscope(), bx - bw * 0.3, top, bz, { ry: -0.4 + Math.random() * 0.8 });
+    place(labStool(), bx + (Math.random() - 0.5) * bw * 0.5, 0,
+      bz + (bz < -28 ? -0.95 : 0.95), { ry: Math.random() * 6, solid: true });
   }
 
   // cuves de confinement (déco vivante : bulles lumineuses)
@@ -487,9 +584,31 @@ function buildLab() {
   scene.add(fireGroup);
   doors._fire = { group: fireGroup, light: fireLight, flames, active: true };
   registerInteract('feu', spill, 'Fuite chimique en feu', 3.4);
-  // étagères effondrées de part et d'autre : le feu est le seul passage
-  box(5.0, 1.7, 0.9, M.rust, -4.6, 0.85, -28, { ry: 0.12 });
-  box(5.0, 1.7, 0.9, M.rust, 4.6, 0.85, -28, { ry: -0.09 });
+
+  // rayonnages renversés de part et d'autre : le feu est le seul passage
+  for (const [sx, ry] of [[-4.6, 0.12], [4.6, -0.09]]) {
+    const shelf = new THREE.Group();
+    const PS = initProps();
+    const part = (geo, mat, px, py, pz) => {
+      const m = new THREE.Mesh(geo, mat);
+      m.position.set(px, py, pz);
+      m.castShadow = true; m.receiveShadow = true;
+      shelf.add(m);
+    };
+    for (const ex of [-2.4, 2.4]) part(roundedBox(0.06, 1.75, 0.85, 0.01), PS.darkSteel, ex, 0.88, 0);
+    for (let i = 0; i < 4; i++) part(roundedBox(4.9, 0.04, 0.8, 0.008), PS.steel, 0, 0.22 + i * 0.5, 0);
+    for (let i = 0; i < 9; i++) { // cartons et bidons dessus
+      const bx = -2.1 + Math.random() * 4.2;
+      const by = 0.24 + Math.floor(Math.random() * 3) * 0.5;
+      const c = new THREE.Mesh(roundedBox(0.3, 0.24, 0.3, 0.012),
+        new THREE.MeshStandardMaterial({ color: 0xbfae90, roughness: 0.9 }));
+      c.position.set(bx, by + 0.14, (Math.random() - 0.5) * 0.3);
+      c.rotation.y = Math.random();
+      c.castShadow = true; c.receiveShadow = true;
+      shelf.add(c);
+    }
+    place(shelf, sx, 0, -28, { ry, solid: true });
+  }
   animated.push((dt, t) => {
     const F = doors._fire;
     if (!F.active) return;
@@ -502,22 +621,22 @@ function buildLab() {
     F.flames.geometry.attributes.position.needsUpdate = true;
   });
 
-  // armoire sécurisée (contient le badge d'accès)
-  const cab = box(1.1, 2, 0.6, M.darkMetal, -6.4, 1, -33.8);
-  const cabGlass = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 1.3), M.glassy);
-  cabGlass.position.set(-6.4, 1.15, -33.48);
-  scene.add(cabGlass);
-  doors._cabGlass = cabGlass;
-  registerInteract('armoire', cab, 'Armoire sécurisée — vitre blindée', 2.6);
+  // armoire sécurisée vitrée (contient le badge d'accès, visible derrière la vitre)
+  const cab = place(cabinet(1.05, 2.0, 0.5), -6.4, 0, -33.8, { ry: 0 });
+  doors._cabGlass = cab.userData.pane;
+  registerInteract('armoire', cab.children[0], 'Armoire sécurisée — vitre blindée', 2.8);
+  const theBadge = place(badge(), -6.4, 0.63, -33.72, { ry: 0.25 });
+  theBadge.rotation.x = -Math.PI / 2;
+  animated.push((dt, t) => { theBadge.rotation.z = Math.sin(t * 0.5) * 0.1; });
   const cs = textSign('ACCÈS NIVEAU 4', 0.9, 0.25, '#ffb347', '#241a08');
   cs.position.set(-6.4, 2.25, -33.45);
 
-  ceilLight(-3.6, 3.55, -24, { intensity: 24, dist: 12 });
-  ceilLight(3.6, 3.55, -24, { intensity: 24, dist: 12, shadow: true });
-  ceilLight(-3.6, 3.55, -28, { intensity: 24, dist: 12 });
-  ceilLight(3.6, 3.55, -28, { intensity: 24, dist: 12 });
-  ceilLight(-3.6, 3.55, -32, { intensity: 24, dist: 12 });
-  ceilLight(3.6, 3.55, -32, { intensity: 24, dist: 12 });
+  ceilLight(-3.6, 3.55, -24, { intensity: 12, dist: 12 });
+  ceilLight(3.6, 3.55, -24, { intensity: 12, dist: 12, shadow: true });
+  ceilLight(-3.6, 3.55, -28, { intensity: 12, dist: 12 });
+  ceilLight(3.6, 3.55, -28, { intensity: 12, dist: 12 });
+  ceilLight(-3.6, 3.55, -32, { intensity: 12, dist: 12 });
+  ceilLight(3.6, 3.55, -32, { intensity: 12, dist: 12 });
 }
 
 export function extinguishFire() {
@@ -559,14 +678,15 @@ function buildServerRoom() {
   for (const sx of [-3.6, 3.6]) {
     for (let i = 0; i < 4; i++) {
       const z = -37.5 - i * 2.1;
-      box(1.1, 2.6, 1.5, M.darkMetal, sx, 1.3, z);
+      place(serverRack(0.95, 2.5, 1.4), sx, 0, z, { ry: sx < 0 ? Math.PI / 2 : -Math.PI / 2, solid: true });
       const ledCanvas = document.createElement('canvas');
       ledCanvas.width = 64; ledCanvas.height = 128;
       const lc = ledCanvas.getContext('2d');
       const ledTex = new THREE.CanvasTexture(ledCanvas);
       const ledMat = new THREE.MeshStandardMaterial({ map: ledTex, emissive: 0xffffff, emissiveMap: ledTex, emissiveIntensity: 1.2 });
-      const face = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 2.3), ledMat);
-      face.position.set(sx + (sx < 0 ? 0.56 : -0.56), 1.3, z);
+      // posée juste devant la porte de la baie (demi-profondeur 0.7 + porte)
+      const face = new THREE.Mesh(new THREE.PlaneGeometry(0.82, 2.25), ledMat);
+      face.position.set(sx + (sx < 0 ? 0.735 : -0.735), 1.28, z);
       face.rotation.y = sx < 0 ? Math.PI / 2 : -Math.PI / 2;
       scene.add(face);
       ledMats.push({ lc, ledTex });
@@ -591,14 +711,27 @@ function buildServerRoom() {
     }
   });
 
-  // ---- grille laser barrant la salle (z=-41) ----
+  // ---- grille laser barrant la salle (z=-41), avec ses émetteurs muraux ----
   const laserGroup = new THREE.Group();
   const lmat = new THREE.MeshStandardMaterial({ color: 0xff2222, emissive: 0xff2222, emissiveIntensity: 3, transparent: true, opacity: 0.8 });
+  const PS = initProps();
   for (let i = 0; i < 6; i++) {
     const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 9.6, 6), lmat);
     beam.rotation.z = Math.PI / 2;
     beam.position.y = 0.3 + i * 0.45;
     laserGroup.add(beam);
+  }
+  for (const sx of [-4.85, 4.85]) { // rails d'émetteurs de part et d'autre
+    const rail = new THREE.Mesh(roundedBox(0.12, 2.9, 0.18, 0.02), PS.darkSteel);
+    rail.position.set(sx, 1.45, 0);
+    rail.castShadow = true;
+    laserGroup.add(rail);
+    for (let i = 0; i < 6; i++) {
+      const emit = new THREE.Mesh(new THREE.CylinderGeometry(0.026, 0.03, 0.05, 12), PS.chrome);
+      emit.rotation.z = Math.PI / 2;
+      emit.position.set(sx + (sx < 0 ? 0.07 : -0.07), 0.3 + i * 0.45, 0);
+      laserGroup.add(emit);
+    }
   }
   const laserLight = new THREE.PointLight(0xff2222, 8, 7, 1.8);
   laserLight.position.y = 1.4;
@@ -612,20 +745,15 @@ function buildServerRoom() {
     L.mat.opacity = 0.65 + Math.sin(t * 9) * 0.2;
   });
 
-  // terminal central de pilotage
-  const term = box(1.2, 1.1, 0.6, M.darkMetal, 3.9, 0.55, -40.2);
-  const screen = new THREE.Mesh(
-    new THREE.PlaneGeometry(0.9, 0.55),
-    new THREE.MeshStandardMaterial({ color: 0x061410, emissive: 0x35e0a1, emissiveIntensity: 0.9 })
-  );
-  screen.position.set(3.9, 1.28, -40.2);
-  screen.rotation.x = -0.35;
-  scene.add(screen);
-  registerInteract('terminal_srv', term, 'Terminal de sécurité — session verrouillée', 2.6);
+  // terminal central de pilotage, sur son bureau
+  place(labBench(1.5, 0.7, 0.78), 3.85, 0, -40.2, { ry: -Math.PI / 2, solid: true });
+  const term = place(terminal(0.56, 0.36), 3.85, 0.82, -40.2, { ry: -Math.PI / 2 });
+  registerInteract('terminal_srv', term.children[2], 'Terminal de sécurité — session verrouillée', 2.8);
+  place(labStool(), 2.9, 0, -40.2, { ry: 1.2, solid: true });
 
   // éclairage propre, avec un témoin rouge discret côté grille laser
-  ceilLight(0, 3.35, -37.5, { intensity: 22, dist: 12 });
-  ceilLight(0, 3.35, -43.5, { intensity: 22, dist: 12, shadow: true });
+  ceilLight(0, 3.35, -37.5, { intensity: 11, dist: 12 });
+  ceilLight(0, 3.35, -43.5, { intensity: 11, dist: 12, shadow: true });
   const statut = new THREE.PointLight(0xff4433, 4, 6, 2);
   statut.position.set(0, 3, -41);
   scene.add(statut);
@@ -662,64 +790,48 @@ function buildHangar() {
   const sign = textSign('HANGAR — ASCENSEUR DE SURFACE', 3.4, 0.55, '#ffd23f', '#211a04');
   sign.position.set(0, 3.5, -50.03); sign.rotation.y = Math.PI;
 
-  // caisses, bidons — couverture "vivante"
-  for (const [cx, cz, s, r] of [[-4.4, -52, 1.1, 0.3], [-3.4, -52.4, 0.8, 1.1], [4.5, -55, 1.2, 0.2], [3.6, -51.5, 0.7, 0.8], [-4.6, -56, 0.9, 0.5]]) {
-    box(s, s, s, Math.random() < 0.5 ? M.rust : M.warn, cx, s / 2, cz, { ry: r });
+  // caisses cerclées et bidons nervurés — le hangar respire
+  for (const [cx, cz, s, r] of [[-4.4, -52, 1.05, 0.3], [-3.35, -52.4, 0.78, 1.1],
+    [4.5, -55, 1.15, 0.2], [3.6, -51.5, 0.7, 0.8], [-4.6, -56, 0.9, 0.5]]) {
+    place(crate(s), cx, 0, cz, { ry: r, solid: true });
   }
-  for (const [cx, cz] of [[5.2, -52.5], [5.5, -53.3]]) {
-    const drum = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 0.9, 14), M.warn);
-    drum.position.set(cx, 0.45, cz);
-    drum.castShadow = true;
-    scene.add(drum);
-    colliders.push(new THREE.Box3().setFromObject(drum));
+  place(crate(0.7), -4.4, 1.05, -52, { ry: 0.9, solid: false }); // empilée
+  for (const [cx, cz, r] of [[5.2, -52.5, 0.2], [5.55, -53.35, 1.1], [5.1, -54.2, 2.2]]) {
+    place(drum(), cx, 0, cz, { ry: r, solid: true });
   }
 
-  // ---- le chien de garde ----
-  const dog = new THREE.Group();
-  const fur = new THREE.MeshStandardMaterial({ color: 0x3b2f24, roughness: 0.95 });
-  const bodyM = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.36, 0.32), fur); bodyM.position.y = 0.48; dog.add(bodyM);
-  const head = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.24, 0.24), fur); head.position.set(0.44, 0.62, 0); dog.add(head);
-  const snout = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.1, 0.12), fur); snout.position.set(0.6, 0.57, 0); dog.add(snout);
-  for (const ex of [0.5]) for (const ez of [-0.07, 0.07]) {
-    const ear = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.12, 4), fur);
-    ear.position.set(0.42, 0.78, ez); dog.add(ear);
-  }
-  const eyes = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.03, 0.2),
-    new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0xff4422, emissiveIntensity: 1.5 }));
-  eyes.position.set(0.57, 0.66, 0); dog.add(eyes);
-  for (const lx of [-0.24, 0.24]) for (const lz of [-0.1, 0.1]) {
-    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.32, 0.09), fur);
-    leg.position.set(lx, 0.16, lz); dog.add(leg);
-  }
-  const tail = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.06, 0.06), fur);
-  tail.position.set(-0.45, 0.6, 0); tail.rotation.z = 0.5; dog.add(tail);
-  dog.position.set(0, 0, -53.5);
-  dog.rotation.y = Math.PI / 2; // face au joueur qui arrive
-  scene.add(dog);
+  // ---- le chien de garde (berger allemand articulé) ----
+  const dog = guardDog();
+  place(dog, 0, 0, -53.5, { ry: Math.PI / 2 }); // face au joueur qui arrive
+  const { legs, tail, eyes } = dog.userData;
   doors._dog = { group: dog, tail, eyes, calm: false, baseZ: -53.5 };
-  registerInteract('chien', bodyM, 'Chien de garde — il grogne…', 5.5);
+  registerInteract('chien', dog.children[0], 'Chien de garde — il grogne…', 5.5);
   animated.push((dt, t) => {
     const D = doors._dog;
     if (D.calm) {
-      D.tail && (D.tail.rotation.z = 0.5 + Math.sin(t * 10) * 0.5); // remue la queue
+      tail.rotation.y = Math.sin(t * 11) * 0.7;          // remue la queue
+      legs.forEach((l) => { l.rotation.z = 0; });
+      dog.position.y = 0;
       return;
     }
-    dog.position.x = Math.sin(t * 0.9) * 1.6; // fait les cent pas
+    dog.position.x = Math.sin(t * 0.9) * 1.6;            // fait les cent pas
     dog.rotation.y = Math.PI / 2 + Math.cos(t * 0.9) * 0.5;
-    bodyM.position.y = 0.48 + Math.abs(Math.sin(t * 6)) * 0.02;
+    dog.position.y = Math.abs(Math.sin(t * 5.4)) * 0.022; // léger rebond de marche
+    // le chien regarde vers +X : les pattes balancent autour de Z, en diagonale
+    legs.forEach((l, i) => {
+      const diagonal = (i === 0 || i === 3) ? 0 : Math.PI;
+      l.rotation.z = Math.sin(t * 5.4 + diagonal) * 0.38;
+    });
+    tail.rotation.y = Math.sin(t * 2.2) * 0.22;
   });
 
   // ---- porte blindée finale + lecteur de badge ----
   slidingDoor('porte_finale', 0, -58.15, {
-    width: 4.0, height: 3.2, mat: M.rust, label: 'Porte blindée — ascenseur de surface',
+    width: 4.0, height: 3.2, mat: M.metal, label: 'Porte blindée — ascenseur de surface',
   });
-  const reader = box(0.18, 0.3, 0.1, M.darkMetal, 2.3, 1.3, -57.9, { solid: false });
-  const readerLamp = new THREE.Mesh(new THREE.CircleGeometry(0.035, 10),
-    new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0xff2222, emissiveIntensity: 2 }));
-  readerLamp.position.set(2.3, 1.42, -57.84);
-  scene.add(readerLamp);
-  doors._readerLamp = readerLamp;
-  registerInteract('lecteur_badge', reader, 'Lecteur de badge — niveau 4 requis', 2.4);
+  const reader = place(badgeReader(), 2.3, 1.35, -57.92);
+  doors._readerLamp = reader.userData.led;
+  registerInteract('lecteur_badge', reader.children[0], 'Lecteur de badge — niveau 4 requis', 2.6);
 
   // derrière la porte : cabine d'ascenseur baignée de lumière
   slab(4.2, 3, M.metal, 0, -0.08, -60);
@@ -731,19 +843,22 @@ function buildHangar() {
   halo.position.set(0, 1.8, -60.5);
   scene.add(halo);
 
-  ceilLight(-3, 4.55, -52, { intensity: 26, dist: 13 });
-  ceilLight(3, 4.55, -52, { intensity: 26, dist: 13, shadow: true });
-  ceilLight(-3, 4.55, -56, { intensity: 26, dist: 13 });
-  ceilLight(3, 4.55, -56, { intensity: 26, dist: 13 });
-  ceilLight(0, 3.35, -48, { intensity: 18, dist: 10 });
+  ceilLight(-3, 4.55, -52, { intensity: 12, dist: 13 });
+  ceilLight(3, 4.55, -52, { intensity: 12, dist: 13, shadow: true });
+  ceilLight(-3, 4.55, -56, { intensity: 12, dist: 13 });
+  ceilLight(3, 4.55, -56, { intensity: 12, dist: 13 });
+  ceilLight(0, 3.35, -48, { intensity: 9, dist: 10 });
 }
 
 export function calmDog() {
   const D = doors._dog;
   if (!D) return;
   D.calm = true;
-  D.eyes.material.emissive.set(0x222222);
-  D.eyes.material.emissiveIntensity = 0.2;
+  // le chien a deux yeux : D.eyes est un tableau de meshes
+  for (const e of D.eyes) {
+    e.material.emissive.set(0x241a10);
+    e.material.emissiveIntensity = 0.15;
+  }
   // le chien part manger dans un coin
   const start = D.group.position.clone();
   let p = 0;
@@ -800,8 +915,10 @@ export function buildWorld(sceneRef, camera) {
 
   scene.fog = new THREE.FogExp2(0xe2e7ea, 0.02);
   scene.background = new THREE.Color(0xe2e7ea);
-  scene.add(new THREE.AmbientLight(0xffffff, 0.62));
-  const hemi = new THREE.HemisphereLight(0xffffff, 0x9aa4a8, 0.5);
+  // L'éclairage d'environnement (main.js) fournit déjà le remplissage : ambiante
+  // et hémisphère restent discrètes, sinon tout part en surexposition blanche.
+  scene.add(new THREE.AmbientLight(0xffffff, 0.16));
+  const hemi = new THREE.HemisphereLight(0xdceaf2, 0x8f9aa0, 0.22);
   scene.add(hemi);
 
   buildCell();
@@ -810,6 +927,7 @@ export function buildWorld(sceneRef, camera) {
   buildServerRoom();
   buildHangar();
   buildDust();
+  buildLightPool();
 
   // lampe torche (activée si un téléphone est matérialisé)
   flashlight = new THREE.SpotLight(0xf2f7ff, 0, 16, 0.5, 0.45, 1.2);
@@ -824,7 +942,8 @@ export function buildWorld(sceneRef, camera) {
 export function setFlashlight(on) { if (flashlight) flashlight.intensity = on ? 26 : 0; }
 export function isFlashlightOn() { return flashlight && flashlight.intensity > 0; }
 
-export function updateWorld(dt, t) {
+export function updateWorld(dt, t, playerPos) {
+  updateLightPool(playerPos);
   for (const fn of animated) fn(dt, t);
 }
 
