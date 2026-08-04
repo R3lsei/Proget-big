@@ -4,10 +4,15 @@ Usage:
     python cli.py tripo text "a low-poly fox" --output ./output
     python cli.py tripo image ./cat.png --output ./output
 
-    python cli.py elevenlabs voices                 # doubler tout le jeu
+    python cli.py elevenlabs voices                 # doubler tout le jeu (avec clé API)
     python cli.py elevenlabs voices --dry-run       # lister sans dépenser
     python cli.py elevenlabs list                   # voix disponibles
     python cli.py elevenlabs say "Bonjour Sujet 23" # une seule réplique
+
+    # Sans clé API : téléchargez les répliques à la main sur elevenlabs.io,
+    # puis importez-les d'un coup.
+    python cli.py elevenlabs script                 # affiche les répliques numérotées
+    python cli.py elevenlabs import ./mes_voix       # importe un dossier de fichiers
 """
 
 import argparse
@@ -55,6 +60,13 @@ def build_parser() -> argparse.ArgumentParser:
     say.add_argument("--output", default="./output")
     say.add_argument("--voice", default=None)
 
+    el_sub.add_parser("script", help="Print the numbered lines to record/download manually")
+
+    imp = el_sub.add_parser("import", help="Import manually downloaded audio files")
+    imp.add_argument("folder", help="folder containing 01.mp3, 02.mp3, ...")
+    imp.add_argument("--output", default="./game/voices")
+    imp.add_argument("--move", action="store_true", help="move instead of copy")
+
     return parser
 
 
@@ -89,9 +101,20 @@ def run_tripo(args) -> None:
 
 
 def run_elevenlabs(args) -> None:
-    from integrations.elevenlabs import (
-        ElevenLabsError, generate_game_voices, list_voices, synthesize,
-    )
+    from integrations.elevenlabs import ElevenLabsError, list_voices, synthesize
+    from integrations.elevenlabs.generate import generate_game_voices, import_folder, print_script
+
+    # "script" et "import" ne touchent jamais l'API : pas besoin de clé.
+    if args.mode == "script":
+        print_script()
+        return
+    if args.mode == "import":
+        try:
+            import_folder(args.folder, output_dir=args.output, move=args.move)
+        except ElevenLabsError as exc:
+            print(f"Error: {exc}", file=sys.stderr)
+            sys.exit(1)
+        return
 
     try:
         if args.mode == "voices":
