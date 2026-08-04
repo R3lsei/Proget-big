@@ -114,13 +114,35 @@ game/
 Par défaut, le Dr Lenoir parle avec la synthèse vocale du navigateur — correcte,
 mais robotique. Pour un vrai doublage :
 
+**Le plus simple** — double-cliquez sur le lanceur à la racine du dépôt :
+
+- Windows : `INSTALLER-LES-VOIX-Windows.bat`
+- macOS / Linux : `INSTALLER-LES-VOIX-Mac-Linux.command`
+
+L'assistant pose les questions une par une : il installe les dépendances,
+ouvre la page de création de clé, vérifie la clé, liste vos voix, vous en fait
+écouter une, puis génère les 74 répliques. La clé est saisie en aveugle et
+n'est jamais affichée.
+
+En ligne de commande :
+
 ```bash
+python installer_voix.py               # le même assistant
+
+# ou, étape par étape :
 pip install -r requirements.txt
 # ELEVENLABS_API_KEY dans .env (https://elevenlabs.io/app/settings/api-keys)
-
 python cli.py elevenlabs list          # choisir une voix -> ELEVENLABS_VOICE_ID
 python cli.py elevenlabs voices --dry-run   # voir les 74 répliques, sans dépenser
 python cli.py elevenlabs voices        # génère game/voices/*.mp3 + manifest.json
+```
+
+**Sans clé API**, vous pouvez tout faire depuis le site d'ElevenLabs :
+
+```bash
+python cli.py elevenlabs script         # affiche les 74 répliques numérotées
+# … générez-les sur le site, nommez les fichiers 01.mp3, 02.mp3, …
+python cli.py elevenlabs import ./mes_voix
 ```
 
 Les fichiers sont mis en cache : relancer la commande ne re-synthétise que les
