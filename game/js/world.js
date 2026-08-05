@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from '../lib/GLTFLoader.js';
 import { mergeGeometries } from '../lib/BufferGeometryUtils.js';
+import { modele, aModele } from './models.js';
 import {
   initProps, roundedBox, beaker, testTubeRack, microscope, labBench, labStool,
   terminal, serverRack, crate, drum, pipeRun, securityCamera, badgeReader,
@@ -97,6 +98,15 @@ function fusionnerStatiques() {
   }
   bakeCandidates.length = 0;
   return { avant, apres };
+}
+
+/**
+ * Renvoie le prop demandé : le modèle 3D importé s'il existe dans
+ * game/models/, sinon la version modélisée en primitives. C'est le seul point
+ * du code qui décide entre les deux — tout le reste ignore la différence.
+ */
+function prop(nom, procedural) {
+  return aModele(nom) ? modele(nom) : procedural();
 }
 
 /** Plinthe sombre au pied d'un mur : casse le blanc et ancre la pièce. */
@@ -433,8 +443,8 @@ function buildCell() {
   slidingDoor('porte_cellule', 0, -2.15, { label: 'Porte de cellule — serrure mécanique' });
 
   // lit de camp, lavabo : props modélisés (cadre tubulaire, robinet col-de-cygne…)
-  place(cot(), -1.5, 0, 0.7, { ry: 0, solid: true });
-  place(sink(), 1.72, 0, 1.5, { ry: -Math.PI / 2, solid: true });
+  place(prop('lit', cot), -1.5, 0, 0.7, { ry: 0, solid: true });
+  place(prop('lavabo', sink), 1.72, 0, 1.5, { ry: -Math.PI / 2, solid: true });
 
   // grille d'aération à lames (mur est, près du sol) → conduit vers le couloir
   const grille = dynamique(place(ventGrille(0.75, 0.85), 2.0, 0.62, -1.2, { ry: -Math.PI / 2 }));
@@ -502,8 +512,8 @@ function buildCorridor() {
   sign.position.set(0, 2.5, -3.2); sign.rotation.y = 0;
 
   // chariots abandonnés : le couloir respire
-  place(trolley(), -1.05, 0, -6.4, { ry: 0.3, solid: true });
-  place(trolley(), 1.0, 0, -14.2, { ry: -0.5, solid: true });
+  place(prop('chariot', trolley), -1.05, 0, -6.4, { ry: 0.3, solid: true });
+  place(prop('chariot', trolley), 1.0, 0, -14.2, { ry: -0.5, solid: true });
 
   // casier du gardien (secret optionnel : un peu d'histoire)
   const locker = new THREE.Group();
@@ -624,17 +634,17 @@ function buildLab() {
 
   // paillasses équipées : verrerie, portoirs à tubes, microscopes, tabourets
   for (const [bx, bz, bw] of [[-4, -24.5, 4.5], [4, -24.5, 4.5], [-4, -31.5, 4.5], [4, -31.5, 4.5]]) {
-    place(labBench(bw, 0.78, 0.9), bx, 0, bz, { solid: true });
+    place(prop('paillasse', () => labBench(bw, 0.78, 0.9)), bx, 0, bz, { solid: true });
     const top = 0.94;
     for (let i = 0; i < 4; i++) {
       const x = bx - bw / 2 + 0.5 + Math.random() * (bw - 1.0);
       const z = bz + (Math.random() - 0.5) * 0.4;
-      place(beaker(0.12 + Math.random() * 0.09, 0.04 + Math.random() * 0.025), x, top, z,
+      place(prop('becher', () => beaker(0.12 + Math.random() * 0.09, 0.04 + Math.random() * 0.025)), x, top, z,
         { ry: Math.random() * 3 });
     }
-    place(testTubeRack(5), bx + bw * 0.28, top, bz - 0.16, { ry: 0.1 });
-    place(microscope(), bx - bw * 0.3, top, bz, { ry: -0.4 + Math.random() * 0.8 });
-    place(labStool(), bx + (Math.random() - 0.5) * bw * 0.5, 0,
+    place(prop('portoir', () => testTubeRack(5)), bx + bw * 0.28, top, bz - 0.16, { ry: 0.1 });
+    place(prop('microscope', microscope), bx - bw * 0.3, top, bz, { ry: -0.4 + Math.random() * 0.8 });
+    place(prop('tabouret', labStool), bx + (Math.random() - 0.5) * bw * 0.5, 0,
       bz + (bz < -28 ? -0.95 : 0.95), { ry: Math.random() * 6, solid: true });
   }
 
@@ -726,7 +736,7 @@ function buildLab() {
   });
 
   // armoire sécurisée vitrée (contient le badge d'accès, visible derrière la vitre)
-  const cab = place(cabinet(1.05, 2.0, 0.5), -6.4, 0, -33.8, { ry: 0 });
+  const cab = place(prop('armoire', () => cabinet(1.05, 2.0, 0.5)), -6.4, 0, -33.8, { ry: 0 });
   doors._cabGlass = dynamique(cab.userData.pane);
   registerInteract('armoire', cab.children[0], 'Armoire sécurisée — vitre blindée', 2.8);
   const theBadge = dynamique(place(badge(), -6.4, 0.63, -33.72, { ry: 0.25 }));
@@ -782,7 +792,7 @@ function buildServerRoom() {
   for (const sx of [-3.6, 3.6]) {
     for (let i = 0; i < 4; i++) {
       const z = -37.5 - i * 2.1;
-      place(serverRack(0.95, 2.5, 1.4), sx, 0, z, { ry: sx < 0 ? Math.PI / 2 : -Math.PI / 2, solid: true });
+      place(prop('serveur', () => serverRack(0.95, 2.5, 1.4)), sx, 0, z, { ry: sx < 0 ? Math.PI / 2 : -Math.PI / 2, solid: true });
       const ledCanvas = document.createElement('canvas');
       ledCanvas.width = 64; ledCanvas.height = 128;
       const lc = ledCanvas.getContext('2d');
@@ -851,10 +861,10 @@ function buildServerRoom() {
   });
 
   // terminal central de pilotage, sur son bureau
-  place(labBench(1.5, 0.7, 0.78), 3.85, 0, -40.2, { ry: -Math.PI / 2, solid: true });
+  place(prop('paillasse', () => labBench(1.5, 0.7, 0.78)), 3.85, 0, -40.2, { ry: -Math.PI / 2, solid: true });
   const term = dynamique(place(terminal(0.56, 0.36), 3.85, 0.82, -40.2, { ry: -Math.PI / 2 }));
   registerInteract('terminal_srv', term.children[2], 'Terminal de sécurité — session verrouillée', 2.8);
-  place(labStool(), 2.9, 0, -40.2, { ry: 1.2, solid: true });
+  place(prop('tabouret', labStool), 2.9, 0, -40.2, { ry: 1.2, solid: true });
 
   // éclairage propre, avec un témoin rouge discret côté grille laser
   ceilLight(0, 3.35, -37.5, { intensity: 11, dist: 12 });
@@ -898,11 +908,11 @@ function buildHangar() {
   // caisses cerclées et bidons nervurés — le hangar respire
   for (const [cx, cz, s, r] of [[-4.4, -52, 1.05, 0.3], [-3.35, -52.4, 0.78, 1.1],
     [4.5, -55, 1.15, 0.2], [3.6, -51.5, 0.7, 0.8], [-4.6, -56, 0.9, 0.5]]) {
-    place(crate(s), cx, 0, cz, { ry: r, solid: true });
+    place(prop('caisse', () => crate(s)), cx, 0, cz, { ry: r, solid: true });
   }
-  place(crate(0.7), -4.4, 1.05, -52, { ry: 0.9, solid: false }); // empilée
+  place(prop('caisse', () => crate(0.7)), -4.4, 1.05, -52, { ry: 0.9, solid: false }); // empilée
   for (const [cx, cz, r] of [[5.2, -52.5, 0.2], [5.55, -53.35, 1.1], [5.1, -54.2, 2.2]]) {
-    place(drum(), cx, 0, cz, { ry: r, solid: true });
+    place(prop('bidon', drum), cx, 0, cz, { ry: r, solid: true });
   }
 
   // ---- le chien de garde (berger allemand articulé) ----

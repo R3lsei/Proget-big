@@ -10,6 +10,7 @@ import { RoomEnvironment } from '../lib/RoomEnvironment.js';
 import { EXRLoader } from '../lib/EXRLoader.js';
 import labHdri from '../lib/assets/lab-hdri.js';
 import { requestRealModel } from './tripo.js';
+import { chargerModeles } from './models.js';
 import { Player } from './player.js';
 import { loadModel, openScanner, closeScanner, captureStableObject, onDetectionAnnounce } from './vision.js';
 import { initAudio, resumeAudio, speak, sfxScan, loadVoiceManifest, spokenLines } from './audio.js';
@@ -59,6 +60,11 @@ window.addEventListener('resize', () => {
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
+
+// Les modèles importés doivent être chargés avant la construction : la fusion
+// des géométries statiques se fait à ce moment-là, on ne peut plus substituer
+// un prop ensuite. Un dossier models/ vide n'ajoute qu'une poignée de 404.
+await chargerModeles();
 
 buildWorld(scene, camera);
 const player = new Player(camera, renderer.domElement);

@@ -64,6 +64,29 @@ class GameHandler(SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def do_GET(self):
+        # Manifeste des modèles généré à la volée depuis le contenu du dossier.
+        # Sans lui, le jeu doit sonder chaque nom possible et la console se
+        # remplit de 404 ; ici il sait d'emblée quoi charger.
+        if self.path.split("?")[0] in ("/models/manifest.json", "/models/manifest.json/"):
+            dossier = GAME_DIR / "models"
+            noms = []
+            if dossier.is_dir():
+                for f in sorted(dossier.iterdir()):
+                    if f.suffix.lower() in (".glb", ".gltf"):
+                        noms.append(f.stem)
+            self._json(200, {"modeles": sorted(set(noms))})
+            return
+        super().do_GET()
+
+    def do_HEAD(self):
+        if self.path.split("?")[0].startswith("/models/manifest.json"):
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            return
+        super().do_HEAD()
+
     def do_POST(self):
         if self.path != "/api/tripo3d":
             self.send_error(404)
