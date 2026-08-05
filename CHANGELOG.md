@@ -6,6 +6,10 @@ Versionnement [SemVer](https://semver.org/lang/fr/).
 ## [Non publié]
 
 ### Ajouté
+- **Module de physique indépendant** (T-003) : la résolution de collisions
+  quitte `player.js` pour `physics/`, opérant sur des boîtes de six nombres
+  plutôt que sur des `THREE.Box3`. La physique ne dépend plus du rendu et se
+  teste en millisecondes. 15 tests verrouillent B-001.
 - **Harnais de test JavaScript** (T-002) : 18 tests en 0,5 s, sans aucune
   dépendance de développement. Lanceur natif de Node, résolveur du spécificateur
   `three` vers la copie vendorée du jeu, exécution automatique en CI pour
@@ -37,6 +41,10 @@ Versionnement [SemVer](https://semver.org/lang/fr/).
 - Lumières : 25 sources → pool de 6 suivant le joueur, coût de shader constant.
 
 ### Corrigé
+- **Traversée d'obstacle sur déplacement long** (B-014) : trouvé par les tests
+  de T-003, jamais observé en jeu. Un pas plus long que le gabarit du joueur
+  franchissait un mur sans le détecter — invisible à 120 FPS, atteignable sur
+  un à-coup de 100 ms. Corrigé par découpage en sous-pas.
 - **Joueur éjecté hors de la carte** après avoir coupé ses liens (B-001).
 - Fusion de géométries silencieusement inopérante sur groupes mixtes (B-002).
 - Matériaux clonés empêchant toute fusion (B-003).

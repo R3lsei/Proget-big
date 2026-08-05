@@ -2,7 +2,12 @@
 
 import * as THREE from 'three';
 import { colliders } from './world.js';
+import { deplacerSurAxe, contraindreAuxLimites } from './physics/collision.js';
 import { sfxFootstep, sfxJump, sfxLand } from './audio.js';
+
+// Emprise du complexe. Sortir de ces bornes est forcément un bug : on ramène
+// alors le joueur à sa dernière position valide (voir physics/collision.js).
+const LIMITES = { minX: -8.5, maxX: 8.5, minY: -1, maxY: 7, minZ: -62, maxZ: 3.5 };
 
 const EYE = 1.62;          // hauteur des yeux
 const HEIGHT = 1.75;       // taille du sujet 23
@@ -11,6 +16,9 @@ const SPEED = 3.6;         // m/s marche
 const RUN = 5.6;           // m/s course (Shift)
 const JUMP_V = 4.6;
 const GRAVITY = 12.5;
+
+/** Gabarit du joueur, tel que le voit la physique. */
+const GABARIT = { rayon: RADIUS, hauteur: HEIGHT };
 
 export class Player {
   constructor(camera, dom) {
@@ -105,21 +113,24 @@ export class Player {
     }
     this.velocity.y -= GRAVITY * dt;
 
-    // déplacement axe par axe avec résolution de collision
-    this.moveAxis('x', move.x * dt);
-    this.moveAxis('z', move.z * dt);
-    this.moveAxis('y', this.velocity.y * dt);
+    // Déplacement axe par axe, délégué au module de physique. La logique y est
+    // pure et testée (tests/js/collision.test.js) ; ici on ne fait que traduire
+    // entre les Vector3 de three et le corps plat qu'attend la physique.
+    const corps = {
+      x: this.position.x, y: this.position.y, z: this.position.z,
+      vy: this.velocity.y, auSol: this.onGround,
+    };
+    deplacerSurAxe(corps, 'x', move.x * dt, colliders, GABARIT);
+    deplacerSurAxe(corps, 'z', move.z * dt, colliders, GABARIT);
+    deplacerSurAxe(corps, 'y', corps.vy * dt, colliders, GABARIT);
 
-    // filet de sécurité : le complexe tient dans ces limites. Si le joueur en
-    // sort malgré tout, on le ramène à sa dernière position valide plutôt que
-    // de le laisser flotter hors du décor.
-    const p = this.position;
-    if (p.x < -8.5 || p.x > 8.5 || p.z > 3.5 || p.z < -62 || p.y < -1 || p.y > 7) {
-      p.copy(this.lastSafe);
+    if (contraindreAuxLimites(corps, LIMITES, this.lastSafe)) {
       this.velocity.set(0, 0, 0);
-    } else if (this.onGround) {
-      this.lastSafe.copy(p);
     }
+    this.position.set(corps.x, corps.y, corps.z);
+    this.velocity.y = corps.vy;
+    this.onGround = corps.auSol;
+    if (this.onGround) this.lastSafe.copy(this.position);
 
     // sol
     if (this.position.y <= 0) {
@@ -149,42 +160,6 @@ export class Player {
     this.syncCamera();
   }
 
-  /** Déplace le joueur sur UN SEUL axe et résout les collisions sur ce même axe.
-   *  Le joueur est toujours repoussé du côté d'où il vient : jamais à travers
-   *  l'obstacle. Les déplacements infimes sont ignorés — sans ce seuil, un
-   *  résidu de virgule flottante (Math.sin(Math.PI) ≈ 1.2e-16) suffisait à
-   *  déclencher une correction latérale et à éjecter le joueur hors du décor. */
-  moveAxis(axis, amount) {
-    if (!Number.isFinite(amount) || Math.abs(amount) < 1e-6) return;
-
-    const feetBefore = this.position.y;
-    this.position[axis] += amount;
-    const pbox = this.bbox();
-
-    for (const c of colliders) {
-      if (!pbox.intersectsBox(c)) continue;
-
-      if (axis === 'y') {
-        if (amount < 0) {
-          // on ne se pose que sur une surface qui était sous nos pieds
-          if (c.max.y > feetBefore + 0.02) continue;
-          this.position.y = c.max.y + 0.002;
-          this.velocity.y = 0;
-          this.onGround = true;
-        } else {
-          this.position.y = c.min.y - HEIGHT - 0.002;
-          this.velocity.y = 0;
-        }
-      } else if (amount > 0) {
-        this.position[axis] = c.min[axis] - RADIUS - 0.002;
-      } else {
-        this.position[axis] = c.max[axis] + RADIUS + 0.002;
-      }
-
-      pbox.copy(this.bbox());
-    }
-  }
-
   bbox() {
     return new THREE.Box3().setFromCenterAndSize(
       new THREE.Vector3(this.position.x, this.position.y + HEIGHT / 2, this.position.z),
@@ -208,7 +183,12 @@ export class Player {
   /** Repousse le joueur (feu, laser, vapeur, chien) */
   pushBack(strength = 3) {
     const back = this.forwardDir.multiplyScalar(-strength);
-    this.moveAxis('x', back.x * 0.1);
-    this.moveAxis('z', back.z * 0.1);
+    const corps = {
+      x: this.position.x, y: this.position.y, z: this.position.z,
+      vy: this.velocity.y, auSol: this.onGround,
+    };
+    deplacerSurAxe(corps, 'x', back.x * 0.1, colliders, GABARIT);
+    deplacerSurAxe(corps, 'z', back.z * 0.1, colliders, GABARIT);
+    this.position.set(corps.x, corps.y, corps.z);
   }
 }

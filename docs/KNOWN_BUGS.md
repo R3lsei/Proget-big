@@ -7,7 +7,6 @@
 
 | ID | Gravité | Description | Contournement |
 |---|---|---|---|
-| B-010 | Moyenne | Aucun test JavaScript : une régression peut passer inaperçue | Tâche T-002 |
 | B-011 | Faible | `test_tripo_client` échoue si le SDK `tripo3d` n'est pas installé | `pip install -r requirements.txt` |
 | B-012 | Faible | Modèles IA chargés depuis un CDN externe : premier lancement impossible hors-ligne | Accepté en v1 web ; empaquetage prévu en desktop |
 | B-013 | Faible | `world.js` dépasse 1000 lignes | Découpage prévu au jalon 4 |
@@ -16,7 +15,24 @@
 
 ## Fermés — non-régressions à préserver
 
-Chacun de ces bugs doit avoir un test dédié avant la migration (T-003).
+Chacun de ces bugs doit avoir un test dédié. B-001 et B-014 sont verrouillés
+(T-003) ; B-002 et B-004 restent à couvrir (T-006).
+
+### B-014 · Traversée d'obstacle sur déplacement long — **corrigé**
+**Gravité : moyenne.** Trouvé par les tests de T-003, pas en jeu.
+
+La collision n'était testée qu'à l'arrivée du déplacement : un pas plus long
+que le gabarit du joueur franchissait un mur sans jamais le chevaucher.
+Invisible à 120 FPS (6 cm par image), mais un à-coup de 100 ms produit 56 cm —
+assez pour traverser une cloison de 30 cm.
+
+**Correction** : découpage du déplacement en sous-pas bornés par le rayon du
+corps. Ce bug existait dans le code d'origine et n'avait jamais été observé.
+
+**Test à conserver** : `tests/js/collision.test.js` — déplacement de 5 m
+franchissant un mur de 30 cm.
+
+---
 
 ### B-001 · Joueur éjecté hors de la carte
 **Gravité : critique.** Après avoir coupé ses liens, marcher en arrière
@@ -36,8 +52,9 @@ projetait le joueur en (-2,62 · 2,62), hors du décor.
 axe par axe ignorant les déplacements sous `1e-6` ; repoussée toujours du côté
 d'origine ; filet de sécurité ramenant à la dernière position valide.
 
-**Test à conserver** : marche dans les 4 directions + sauts contre les murs, le
-joueur reste dans la cellule.
+**Test à conserver** : `tests/js/collision.test.js` — marche dans les 4
+directions, sauts contre les murs, et reproduction directe du résidu
+`Math.sin(Math.PI)`. Verrouillé depuis T-003.
 
 ---
 

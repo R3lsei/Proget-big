@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from '../lib/GLTFLoader.js';
 import { mergeGeometries } from '../lib/BufferGeometryUtils.js';
 import { modele, aModele } from './models.js';
+import { depuisBox3 } from './physics/aabb.js';
 import {
   initProps, roundedBox, beaker, testTubeRack, microscope, labBench, labStool,
   terminal, serverRack, crate, drum, pipeRun, securityCamera, badgeReader,
@@ -148,12 +149,14 @@ function place(group, x, y, z, { ry = 0, solid = false, scale = 1 } = {}) {
   scene.add(group);
   if (solid) {
     group.updateMatrixWorld(true);
-    colliders.push(new THREE.Box3().setFromObject(group));
+    colliders.push(depuisBox3(new THREE.Box3().setFromObject(group)));
   }
   return group;
 }
 
-export const colliders = [];        // THREE.Box3 solides
+// Boîtes englobantes plates (six nombres), pas des THREE.Box3 : la physique
+// ne doit pas dépendre du rendu. Conversion faite ici, à la construction.
+export const colliders = [];
 export const interactables = [];    // { id, mesh, label, dist }
 const animated = [];                // callbacks update(dt, t)
 
@@ -253,7 +256,7 @@ function box(w, h, d, mat, x, y, z, { solid = true, shadow = true, ry = 0 } = {}
   m.receiveShadow = true;
   scene.add(m);
   bakeCandidates.push(m);
-  if (solid) colliders.push(new THREE.Box3().setFromObject(m));
+  if (solid) colliders.push(depuisBox3(new THREE.Box3().setFromObject(m)));
   return m;
 }
 
@@ -401,7 +404,7 @@ function slidingDoor(id, x, z, { width = 1.5, height = 2.3, ry = 0, mat = null, 
   // jour, le collider du panneau reste à l'origine du monde (mur invisible
   // au milieu de la cellule de départ, et portes qui ne bloquent rien).
   g.updateMatrixWorld(true);
-  const collider = new THREE.Box3().setFromObject(panel);
+  const collider = depuisBox3(new THREE.Box3().setFromObject(panel));
   colliders.push(collider);
   doors[id] = { group: g, panel, lamp, collider, open: false, height };
   registerInteract(id, panel, label, 2.8);
@@ -653,7 +656,7 @@ function buildLab() {
     const tank = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 2.4, 18), M.glassy);
     tank.position.set(cx, 1.3, -28);
     scene.add(tank);
-    colliders.push(new THREE.Box3().setFromObject(tank));
+    colliders.push(depuisBox3(new THREE.Box3().setFromObject(tank)));
     const glow = new THREE.PointLight(0x3fd0a0, 5, 5, 2);
     glow.position.set(cx, 1.4, -28);
     scene.add(glow);
