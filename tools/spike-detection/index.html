@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NOVA-7 — Banc de mesure : détection open-vocabulary</title>
+<style>
+  :root {
+    --bg: #0b1412; --card: #121e1a; --ink: #e2ece8; --soft: #a2b4ad;
+    --accent: #35e0a1; --warn: #e2ac5c; --bad: #ff6b6b; --rule: #24352f;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 15px/1.6 -apple-system, "Segoe UI", Roboto, sans-serif;
+    padding: 2rem 1.5rem 4rem;
+  }
+  .wrap { max-width: 54rem; margin: 0 auto; display: flex; flex-direction: column; gap: 1.75rem; }
+  h1 { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 1.5rem; margin: 0; }
+  h2 {
+    font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 1.05rem;
+    margin: 0 0 .75rem; padding-bottom: .5rem; border-bottom: 1px solid var(--rule);
+  }
+  p { margin: 0 0 .75rem; color: var(--soft); }
+  section { background: var(--card); border: 1px solid var(--rule); border-radius: 4px; padding: 1.25rem; }
+  button {
+    font: 600 .9rem/1 inherit; letter-spacing: .05em;
+    padding: .8rem 1.4rem; border: 0; border-radius: 3px;
+    background: var(--accent); color: #05130d; cursor: pointer;
+  }
+  button:disabled { background: #2a3833; color: #6a7a74; cursor: not-allowed; }
+  button.ghost { background: #22302b; color: var(--ink); }
+  .row { display: flex; gap: .6rem; flex-wrap: wrap; align-items: center; }
+  video, canvas#vue { width: 100%; max-width: 480px; border-radius: 3px; background: #000; display: block; }
+  table { width: 100%; border-collapse: collapse; font-size: .88rem; }
+  th, td { text-align: left; padding: .45rem .6rem; border-bottom: 1px solid var(--rule); }
+  th { color: var(--accent); font-weight: 600; font-size: .74rem; letter-spacing: .1em; text-transform: uppercase; }
+  td.num { font-variant-numeric: tabular-nums; font-family: ui-monospace, Menlo, monospace; }
+  .ok { color: var(--accent); } .warn { color: var(--warn); } .bad { color: var(--bad); }
+  #journal {
+    font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .8rem;
+    background: #08110f; border-radius: 3px; padding: .8rem;
+    max-height: 16rem; overflow-y: auto; white-space: pre-wrap; color: var(--soft);
+  }
+  #verdict { font-size: 1rem; line-height: 1.7; }
+  .badge {
+    display: inline-block; padding: .15rem .5rem; border-radius: 2px;
+    font: 600 .75rem/1.5 ui-monospace, Menlo, monospace; letter-spacing: .06em;
+  }
+  .badge.go { background: #103a2a; color: var(--accent); }
+  .badge.risk { background: #3a2f10; color: var(--warn); }
+  .badge.no { background: #3a1414; color: var(--bad); }
+  input[type=text] {
+    flex: 1; min-width: 14rem; padding: .55rem .7rem; border-radius: 3px;
+    border: 1px solid var(--rule); background: #08110f; color: var(--ink); font: inherit;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>Banc de mesure — détection open-vocabulary</h1>
+    <p>
+      Ce test décide si NOVA-7 peut reposer sur un modèle capable de reconnaître
+      <strong>n'importe quel objet</strong> plutôt que 80 classes figées. Il mesure ce
+      qu'aucune documentation ne peut prédire : le temps de téléchargement, la latence
+      d'inférence sur <em>votre</em> machine, et la justesse sur <em>vos</em> objets.
+      Aucune image ne quitte votre ordinateur.
+    </p>
+  </header>
+
+  <section>
+    <h2>1 · Environnement</h2>
+    <table id="env"><tbody></tbody></table>
+  </section>
+
+  <section>
+    <h2>2 · Chargement du modèle</h2>
+    <p>
+      Le modèle est téléchargé depuis le CDN de HuggingFace puis mis en cache par le
+      navigateur. Le premier chargement est lent, les suivants immédiats — les deux
+      chiffres comptent.
+    </p>
+    <div class="row">
+      <button id="btn-charger">Charger le modèle</button>
+      <button id="btn-vider" class="ghost">Vider le cache et recharger</button>
+    </div>
+    <table id="chargement" style="margin-top:1rem"><tbody></tbody></table>
+  </section>
+
+  <section>
+    <h2>3 · Latence d'inférence</h2>
+    <p>
+      Mesurée sur votre webcam. Le seuil qui compte : sous 300 ms le scan paraît
+      instantané, au-delà d'une seconde il faut repenser l'ergonomie du scanner.
+    </p>
+    <div class="row" style="margin-bottom:.8rem">
+      <input type="text" id="etiquettes"
+             value="ciseaux, couteau, téléphone, livre, bouteille, tasse, stylo, clé, tournevis, cuillère">
+    </div>
+    <p style="font-size:.85rem">
+      Ces étiquettes sont libres : le modèle cherche ce que vous écrivez. C'est
+      précisément ce que COCO-SSD ne sait pas faire.
+    </p>
+    <div class="row">
+      <button id="btn-camera" disabled>Activer la caméra</button>
+      <button id="btn-mesurer" disabled>Mesurer 10 inférences</button>
+    </div>
+    <div class="row" style="margin-top:1rem; align-items:flex-start">
+      <video id="video" autoplay playsinline muted></video>
+      <canvas id="vue" width="480" height="360"></canvas>
+    </div>
+    <table id="latence" style="margin-top:1rem"><tbody></tbody></table>
+  </section>
+
+  <section>
+    <h2>4 · Verdict</h2>
+    <div id="verdict">En attente de mesure.</div>
+  </section>
+
+  <section>
+    <h2>Journal</h2>
+    <div id="journal"></div>
+  </section>
+
+</div>
+
+<script type="module">
+// La bibliothèque est chargée depuis un CDN plutôt que versionnée : le banc a
+// de toute façon besoin du réseau pour les poids du modèle, et un bundle tiers
+// minifié dans l'historique Git est de la dette (voir README.md).
+// Un build local dans lib/ est utilisé en priorité s'il existe.
+let pipeline = null, env = null;
+for (const source of [
+  './lib/detection.min.js',
+  'https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.2.0/+esm',
+]) {
+  try {
+    // le second echec ne doit pas tuer le module : sans cette boucle, la page
+    // reste blanche au lieu d'expliquer ce qui manque
+    ({ pipeline, env } = await import(source));
+    break;
+  } catch (_) { /* source suivante */ }
+}
+
+const $ = (id) => document.getElementById(id);
+const journal = $('journal');
+
+function log(msg) {
+  journal.textContent += msg + '\n';
+  journal.scrollTop = journal.scrollHeight;
+}
+
+function ligne(table, cle, valeur, classe = '') {
+  const tr = document.createElement('tr');
+  tr.innerHTML = `<td>${cle}</td><td class="num ${classe}">${valeur}</td>`;
+  $(table).querySelector('tbody').appendChild(tr);
+}
+
+// ---------------------------------------------------------------- 1. environnement
+async function decrireEnvironnement() {
+  const gpu = 'gpu' in navigator;
+  let adaptateur = null;
+  if (gpu) {
+    try { adaptateur = await navigator.gpu.requestAdapter(); } catch (_) { /* refusé */ }
+  }
+  ligne('env', 'Navigateur', navigator.userAgent.slice(0, 72));
+  ligne('env', 'Cœurs logiques', navigator.hardwareConcurrency ?? 'inconnu');
+  ligne('env', 'Mémoire annoncée', navigator.deviceMemory ? navigator.deviceMemory + ' Go' : 'non exposée');
+  ligne('env', 'WebGPU', adaptateur ? 'disponible' : (gpu ? 'API présente, adaptateur refusé' : 'absent'),
+        adaptateur ? 'ok' : 'warn');
+  ligne('env', 'WebAssembly SIMD', WebAssembly.validate(new Uint8Array(
+    [0,97,115,109,1,0,0,0,1,5,1,96,0,1,123,3,2,1,0,10,10,1,8,0,65,0,253,15,253,98,11]
+  )) ? 'oui' : 'non');
+  return { webgpu: !!adaptateur };
+}
+
+// ---------------------------------------------------------------- 2. modèle
+const MODELE = 'Xenova/owlv2-base-patch16-ensemble';
+let detecteur = null;
+let octetsTelecharges = 0;
+
+async function charger(backend) {
+  env.allowLocalModels = false;
+  octetsTelecharges = 0;
+
+  const t0 = performance.now();
+  log(`Chargement de ${MODELE} (backend : ${backend})…`);
+
+  detecteur = await pipeline('zero-shot-object-detection', MODELE, {
+    device: backend,
+    progress_callback: (p) => {
+      if (p.status === 'progress' && p.total) {
+        octetsTelecharges = Math.max(octetsTelecharges, p.loaded);
+      }
+      if (p.status === 'done' && p.file) log(`  · ${p.file}`);
+    },
+  });
+
+  const duree = performance.now() - t0;
+  log(`Chargé en ${(duree / 1000).toFixed(1)} s.`);
+  return duree;
+}
+
+$('btn-charger').addEventListener('click', async () => {
+  const btn = $('btn-charger');
+  btn.disabled = true;
+  btn.textContent = 'Chargement…';
+  $('chargement').querySelector('tbody').innerHTML = '';
+
+  const { webgpu } = etat;
+  const backend = webgpu ? 'webgpu' : 'wasm';
+  try {
+    const duree = await charger(backend);
+    ligne('chargement', 'Backend retenu', backend, 'ok');
+    ligne('chargement', 'Temps de chargement', (duree / 1000).toFixed(1) + ' s',
+          duree < 15000 ? 'ok' : duree < 40000 ? 'warn' : 'bad');
+    if (octetsTelecharges) {
+      ligne('chargement', 'Téléchargé', (octetsTelecharges / 1048576).toFixed(1) + ' Mo');
+    } else {
+      ligne('chargement', 'Téléchargé', 'depuis le cache navigateur', 'ok');
+    }
+    etat.charge = true;
+    etat.backend = backend;
+    etat.dureeChargement = duree;
+    $('btn-camera').disabled = false;
+    btn.textContent = 'Modèle chargé';
+  } catch (e) {
+    log('ÉCHEC : ' + e.message);
+    ligne('chargement', 'Résultat', 'échec — ' + e.message.slice(0, 60), 'bad');
+    btn.disabled = false;
+    btn.textContent = 'Réessayer';
+  }
+});
+
+$('btn-vider').addEventListener('click', async () => {
+  if ('caches' in window) {
+    for (const c of await caches.keys()) await caches.delete(c);
+    log('Cache vidé. Rechargez la page pour mesurer un démarrage à froid.');
+  }
+});
+
+// ---------------------------------------------------------------- 3. caméra + latence
+const video = $('video');
+const vue = $('vue');
+const ctx = vue.getContext('2d');
+
+$('btn-camera').addEventListener('click', async () => {
+  try {
+    const flux = await navigator.mediaDevices.getUserMedia({
+      video: { width: { ideal: 640 }, height: { ideal: 480 } }, audio: false,
+    });
+    video.srcObject = flux;
+    await video.play();
+    $('btn-mesurer').disabled = false;
+    $('btn-camera').textContent = 'Caméra active';
+    $('btn-camera').disabled = true;
+    log('Caméra active.');
+  } catch (e) {
+    log('Caméra refusée : ' + e.message);
+  }
+});
+
+$('btn-mesurer').addEventListener('click', async () => {
+  const btn = $('btn-mesurer');
+  btn.disabled = true;
+  $('latence').querySelector('tbody').innerHTML = '';
+
+  const etiquettes = $('etiquettes').value.split(',').map((s) => s.trim()).filter(Boolean);
+  const temps = [];
+  let dernier = null;
+
+  for (let i = 0; i < 10; i++) {
+    btn.textContent = `Mesure ${i + 1}/10…`;
+    ctx.drawImage(video, 0, 0, vue.width, vue.height);
+    const image = vue.toDataURL('image/jpeg', 0.85);
+
+    const t0 = performance.now();
+    dernier = await detecteur(image, etiquettes, { threshold: 0.1, topk: 5 });
+    temps.push(performance.now() - t0);
+    await new Promise((r) => setTimeout(r, 60));
+  }
+
+  temps.sort((a, b) => a - b);
+  const median = temps[Math.floor(temps.length / 2)];
+  const p90 = temps[Math.floor(temps.length * 0.9)];
+
+  ligne('latence', 'Médiane', median.toFixed(0) + ' ms',
+        median < 300 ? 'ok' : median < 1000 ? 'warn' : 'bad');
+  ligne('latence', 'p90', p90.toFixed(0) + ' ms', p90 < 500 ? 'ok' : p90 < 1500 ? 'warn' : 'bad');
+  ligne('latence', 'Min / Max', `${temps[0].toFixed(0)} / ${temps[temps.length - 1].toFixed(0)} ms`);
+
+  // dessine ce que le modèle a vu, pour juger la justesse
+  ctx.drawImage(video, 0, 0, vue.width, vue.height);
+  ctx.lineWidth = 2; ctx.font = 'bold 14px monospace';
+  for (const d of (dernier || [])) {
+    const b = d.box;
+    const x = b.xmin * vue.width, y = b.ymin * vue.height;
+    const w = (b.xmax - b.xmin) * vue.width, h = (b.ymax - b.ymin) * vue.height;
+    ctx.strokeStyle = '#35e0a1'; ctx.strokeRect(x, y, w, h);
+    ctx.fillStyle = '#35e0a1';
+    ctx.fillText(`${d.label} ${(d.score * 100).toFixed(0)}%`, x + 4, Math.max(16, y - 5));
+  }
+  log('Détections : ' + (dernier || []).map((d) => `${d.label} ${(d.score * 100) | 0}%`).join(', '));
+
+  etat.median = median;
+  etat.p90 = p90;
+  rendreVerdict();
+  btn.disabled = false;
+  btn.textContent = 'Mesurer à nouveau';
+});
+
+// ---------------------------------------------------------------- 4. verdict
+function rendreVerdict() {
+  const { median, dureeChargement, backend } = etat;
+  if (median == null) return;
+
+  let badge, texte;
+  if (median < 300) {
+    badge = '<span class="badge go">FEU VERT</span>';
+    texte = `Le scan paraîtra instantané. On peut même envisager une détection
+             continue en arrière-plan si le budget images le permet.`;
+  } else if (median < 1000) {
+    badge = '<span class="badge risk">VIABLE AVEC PRÉCAUTIONS</span>';
+    texte = `Latence acceptable pour un scan déclenché à la demande, mais il faut
+             une animation d'attente soignée et surtout ne jamais lancer
+             l'inférence pendant que le joueur se déplace.`;
+  } else {
+    badge = '<span class="badge no">À REPENSER</span>';
+    texte = `Trop lent pour un scan interactif. Options : passer à un modèle plus
+             léger (owlv2-base-patch16 quantifié), réduire la résolution d'entrée,
+             ou basculer sur l'approche hybride COCO-SSD + classification ouverte.`;
+  }
+
+  $('verdict').innerHTML = `
+    ${badge}
+    <p style="margin-top:.75rem">${texte}</p>
+    <p style="margin:0">
+      <strong>Chiffres à reporter dans PERFORMANCE.md :</strong>
+      backend <code>${backend}</code>,
+      chargement ${(dureeChargement / 1000).toFixed(1)} s,
+      inférence médiane ${median.toFixed(0)} ms, p90 ${etat.p90.toFixed(0)} ms.
+    </p>`;
+}
+
+// ---------------------------------------------------------------- amorçage
+const etat = { webgpu: false, charge: false, backend: null, median: null, p90: null, dureeChargement: 0 };
+Object.assign(etat, await decrireEnvironnement());
+if (typeof pipeline !== 'function') {
+  log('ERREUR : bibliothèque de détection introuvable.');
+  log('Vérifiez votre connexion, ou construisez lib/detection.min.js (voir README.md).');
+  $('btn-charger').disabled = true;
+} else {
+  log('Environnement analysé. Lancez le chargement du modèle.');
+}
+</script>
+</body>
+</html>
