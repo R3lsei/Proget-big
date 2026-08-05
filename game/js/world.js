@@ -3,11 +3,101 @@
 
 import * as THREE from 'three';
 import { GLTFLoader } from '../lib/GLTFLoader.js';
+import { mergeGeometries } from '../lib/BufferGeometryUtils.js';
 import {
   initProps, roundedBox, beaker, testTubeRack, microscope, labBench, labStool,
   terminal, serverRack, crate, drum, pipeRun, securityCamera, badgeReader,
   sink, cot, cabinet, badge, vent as ventGrille, guardDog, trolley,
 } from './props.js';
+
+// ------------------------------------------------------------------
+// Fusion des géométries statiques
+//
+// Le décor était dessiné en ~1400 appels : chaque bécher, chaque tiroir, chaque
+// plinthe coûtait un appel, répété à chaque passe d'ombre. Or rien de tout cela
+// ne bouge. On fusionne donc, en fin de construction, tous les maillages
+// immobiles partageant un matériau en un seul objet — les transformations sont
+// cuites dans la géométrie. Reste exclu tout ce qui doit rester manipulable :
+// objets animés et cibles d'interaction (le raycast a besoin d'un mesh à lui).
+// ------------------------------------------------------------------
+const bakeCandidates = [];
+
+/** Marque un objet et sa descendance comme non fusionnables. */
+function dynamique(obj) {
+  obj.userData.dynamic = true;
+  return obj;
+}
+
+function estDynamique(obj) {
+  for (let o = obj; o; o = o.parent) if (o.userData && o.userData.dynamic) return true;
+  return false;
+}
+
+function fusionnerStatiques() {
+  const cibles = new Set(interactables.map((i) => i.mesh));
+  const parMateriau = new Map();
+
+  for (const m of bakeCandidates) {
+    if (!m.parent || !m.isMesh) continue;          // déjà retiré de la scène
+    if (cibles.has(m) || estDynamique(m)) continue;
+    if (Array.isArray(m.material)) continue;        // multi-matériaux : on laisse
+    const cle = m.material.uuid;
+    if (!parMateriau.has(cle)) parMateriau.set(cle, { mat: m.material, meshes: [] });
+    parMateriau.get(cle).meshes.push(m);
+  }
+
+  let avant = 0, apres = 0;
+  for (const { mat, meshes } of parMateriau.values()) {
+    if (meshes.length < 2) continue;
+
+    // mergeGeometries refuse de mélanger géométries indexées et non indexées.
+    // ExtrudeGeometry (nos boîtes biseautées) est non indexée, Box/Cylinder/Lathe
+    // le sont : sans cette normalisation le groupe échoue silencieusement.
+    const melange = meshes.some((m) => m.geometry.index) &&
+                    meshes.some((m) => !m.geometry.index);
+
+    const geos = [];
+    for (const m of meshes) {
+      m.updateWorldMatrix(true, false);
+      let g = m.geometry.clone().applyMatrix4(m.matrixWorld);
+      if (melange && g.index) g = g.toNonIndexed();
+      // les attributs doivent être identiques partout
+      for (const nom of Object.keys(g.attributes)) {
+        if (!['position', 'normal', 'uv'].includes(nom)) g.deleteAttribute(nom);
+      }
+      if (!g.attributes.uv) {
+        const n = g.attributes.position.count;
+        g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(n * 2), 2));
+      }
+      if (!g.attributes.normal) g.computeVertexNormals();
+      geos.push(g);
+    }
+
+    let fusion = null;
+    try {
+      fusion = mergeGeometries(geos, false);
+    } catch (_) {
+      fusion = null;
+    }
+    if (!fusion) { geos.forEach((g) => g.dispose()); continue; }
+
+    const bloc = new THREE.Mesh(fusion, mat);
+    bloc.castShadow = meshes.some((m) => m.castShadow);
+    bloc.receiveShadow = true;
+    bloc.matrixAutoUpdate = false;                  // il ne bougera plus jamais
+    scene.add(bloc);
+
+    avant += meshes.length;
+    apres += 1;
+    for (const m of meshes) {
+      m.parent.remove(m);
+      m.geometry.dispose();
+    }
+    geos.forEach((g) => g.dispose());
+  }
+  bakeCandidates.length = 0;
+  return { avant, apres };
+}
 
 /** Plinthe sombre au pied d'un mur : casse le blanc et ancre la pièce. */
 function skirting(x, z, length, { horizontal = false } = {}) {
@@ -19,6 +109,7 @@ function skirting(x, z, length, { horizontal = false } = {}) {
   m.position.set(x, 0.06, z);
   m.receiveShadow = true;
   scene.add(m);
+  bakeCandidates.push(m);
   return m;
 }
 
@@ -32,6 +123,7 @@ function floorStripe(x, z, length, color = 0x2fb98a, width = 0.16) {
   m.position.set(x, 0.003, z);
   m.receiveShadow = true;
   scene.add(m);
+  bakeCandidates.push(m);
   return m;
 }
 
@@ -40,7 +132,9 @@ function place(group, x, y, z, { ry = 0, solid = false, scale = 1 } = {}) {
   group.position.set(x, y, z);
   group.rotation.y = ry;
   if (scale !== 1) group.scale.setScalar(scale);
-  group.traverse((n) => { if (n.isMesh) { n.castShadow = true; n.receiveShadow = true; } });
+  group.traverse((n) => {
+    if (n.isMesh) { n.castShadow = true; n.receiveShadow = true; bakeCandidates.push(n); }
+  });
   scene.add(group);
   if (solid) {
     group.updateMatrixWorld(true);
@@ -148,6 +242,7 @@ function box(w, h, d, mat, x, y, z, { solid = true, shadow = true, ry = 0 } = {}
   m.castShadow = shadow;
   m.receiveShadow = true;
   scene.add(m);
+  bakeCandidates.push(m);
   if (solid) colliders.push(new THREE.Box3().setFromObject(m));
   return m;
 }
@@ -157,6 +252,7 @@ function slab(w, d, mat, x, y, z) { // sol / plafond (non-collider : géré par 
   m.position.set(x, y, z);
   m.receiveShadow = true;
   scene.add(m);
+  bakeCandidates.push(m);
   return m;
 }
 
@@ -202,6 +298,7 @@ function textSign(text, w, h, color = '#35e0a1', bg = '#101614') {
 // le rendu forward de three évalue TOUTES les lumières sur TOUS les matériaux.
 // Un pool de lumières réelles suit le joueur et se réaffecte aux luminaires les
 // plus proches — coût de shader constant, quel que soit le nombre de dalles.
+let paneMat = null;
 const lightSpots = [];
 const LIGHT_POOL_SIZE = 6;
 const lightPool = [];
@@ -209,12 +306,17 @@ const lightPool = [];
 function ceilLight(x, y, z, { color = 0xffffff, intensity = 11, dist = 14, shadow = false } = {}) {
   // dalle lumineuse encastrée, façon plafond de laboratoire
   box(1.3, 0.06, 0.7, M.metal, x, y + 0.05, z, { solid: false, shadow: false });
-  const pane = new THREE.Mesh(
-    new THREE.BoxGeometry(1.2, 0.03, 0.6),
-    new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: color, emissiveIntensity: 1.35 })
-  );
+  // matériau mutualisé entre toutes les dalles : sans cela, chacune resterait
+  // un appel de dessin distinct car la fusion se fait par matériau
+  if (!paneMat) {
+    paneMat = new THREE.MeshStandardMaterial({
+      color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 1.35,
+    });
+  }
+  const pane = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.03, 0.6), paneMat);
   pane.position.set(x, y, z);
   scene.add(pane);
+  bakeCandidates.push(pane);
   lightSpots.push({ pos: new THREE.Vector3(x, y - 0.3, z), color, intensity, dist, shadow });
 }
 
@@ -283,6 +385,7 @@ function slidingDoor(id, x, z, { width = 1.5, height = 2.3, ry = 0, mat = null, 
   g.add(lamp);
   g.position.set(x, 0, z);
   g.rotation.y = ry;
+  dynamique(g);                       // la porte coulisse : jamais fusionnée
   scene.add(g);
   // setFromObject ne recalcule pas la matrice du parent : sans cette mise à
   // jour, le collider du panneau reste à l'origine du monde (mur invisible
@@ -334,7 +437,7 @@ function buildCell() {
   place(sink(), 1.72, 0, 1.5, { ry: -Math.PI / 2, solid: true });
 
   // grille d'aération à lames (mur est, près du sol) → conduit vers le couloir
-  const grille = place(ventGrille(0.75, 0.85), 2.0, 0.62, -1.2, { ry: -Math.PI / 2 });
+  const grille = dynamique(place(ventGrille(0.75, 0.85), 2.0, 0.62, -1.2, { ry: -Math.PI / 2 }));
   registerInteract('grille_cellule', grille.children[0], 'Grille d\'aération — scellée', 2.4);
   doors._vent = grille;
 
@@ -422,7 +525,7 @@ function buildCorridor() {
   registerInteract('casier', lockerBody, 'Casier du gardien — cadenassé', 2.4);
 
   // caméra de surveillance sur rotule (plafond, avant la porte codée)
-  const cam = place(securityCamera(), 1.1, 2.92, -17.5);
+  const cam = dynamique(place(securityCamera(), 1.1, 2.92, -17.5));
   const head = cam.userData.head;
   registerInteract('cam_secu', head.children[0], 'Caméra de surveillance', 3.4);
   doors._secucam = { group: cam, head, lens: cam.userData.led, active: true };
@@ -581,6 +684,7 @@ function buildLab() {
   fireLight.shadow.normalBias = 0.08;
   fireGroup.add(fireLight);
   fireGroup.position.set(0, 0, -28);
+  dynamique(fireGroup);
   scene.add(fireGroup);
   doors._fire = { group: fireGroup, light: fireLight, flames, active: true };
   registerInteract('feu', spill, 'Fuite chimique en feu', 3.4);
@@ -623,9 +727,9 @@ function buildLab() {
 
   // armoire sécurisée vitrée (contient le badge d'accès, visible derrière la vitre)
   const cab = place(cabinet(1.05, 2.0, 0.5), -6.4, 0, -33.8, { ry: 0 });
-  doors._cabGlass = cab.userData.pane;
+  doors._cabGlass = dynamique(cab.userData.pane);
   registerInteract('armoire', cab.children[0], 'Armoire sécurisée — vitre blindée', 2.8);
-  const theBadge = place(badge(), -6.4, 0.63, -33.72, { ry: 0.25 });
+  const theBadge = dynamique(place(badge(), -6.4, 0.63, -33.72, { ry: 0.25 }));
   theBadge.rotation.x = -Math.PI / 2;
   animated.push((dt, t) => { theBadge.rotation.z = Math.sin(t * 0.5) * 0.1; });
   const cs = textSign('ACCÈS NIVEAU 4', 0.9, 0.25, '#ffb347', '#241a08');
@@ -737,6 +841,7 @@ function buildServerRoom() {
   laserLight.position.y = 1.4;
   laserGroup.add(laserLight);
   laserGroup.position.set(0, 0, -41);
+  dynamique(laserGroup);
   scene.add(laserGroup);
   doors._lasers = { group: laserGroup, active: true, mat: lmat, light: laserLight };
   animated.push((dt, t) => {
@@ -747,7 +852,7 @@ function buildServerRoom() {
 
   // terminal central de pilotage, sur son bureau
   place(labBench(1.5, 0.7, 0.78), 3.85, 0, -40.2, { ry: -Math.PI / 2, solid: true });
-  const term = place(terminal(0.56, 0.36), 3.85, 0.82, -40.2, { ry: -Math.PI / 2 });
+  const term = dynamique(place(terminal(0.56, 0.36), 3.85, 0.82, -40.2, { ry: -Math.PI / 2 }));
   registerInteract('terminal_srv', term.children[2], 'Terminal de sécurité — session verrouillée', 2.8);
   place(labStool(), 2.9, 0, -40.2, { ry: 1.2, solid: true });
 
@@ -802,7 +907,7 @@ function buildHangar() {
 
   // ---- le chien de garde (berger allemand articulé) ----
   const dog = guardDog();
-  place(dog, 0, 0, -53.5, { ry: Math.PI / 2 }); // face au joueur qui arrive
+  dynamique(place(dog, 0, 0, -53.5, { ry: Math.PI / 2 })); // face au joueur qui arrive
   const { legs, tail, eyes } = dog.userData;
   doors._dog = { group: dog, tail, eyes, calm: false, baseZ: -53.5 };
   registerInteract('chien', dog.children[0], 'Chien de garde — il grogne…', 5.5);
@@ -829,7 +934,7 @@ function buildHangar() {
   slidingDoor('porte_finale', 0, -58.15, {
     width: 4.0, height: 3.2, mat: M.metal, label: 'Porte blindée — ascenseur de surface',
   });
-  const reader = place(badgeReader(), 2.3, 1.35, -57.92);
+  const reader = dynamique(place(badgeReader(), 2.3, 1.35, -57.92));
   doors._readerLamp = reader.userData.led;
   registerInteract('lecteur_badge', reader.children[0], 'Lecteur de badge — niveau 4 requis', 2.6);
 
@@ -921,11 +1026,16 @@ export function buildWorld(sceneRef, camera) {
   const hemi = new THREE.HemisphereLight(0xdceaf2, 0x8f9aa0, 0.22);
   scene.add(hemi);
 
-  buildCell();
-  buildCorridor();
-  buildLab();
-  buildServerRoom();
-  buildHangar();
+  // Fusion zone par zone : un bloc unique pour tout le niveau supprimerait le
+  // tri par champ de vision (on dessinerait le hangar depuis la cellule).
+  let gagne = { avant: 0, apres: 0 };
+  for (const construire of [buildCell, buildCorridor, buildLab, buildServerRoom, buildHangar]) {
+    construire();
+    const f = fusionnerStatiques();
+    gagne.avant += f.avant;
+    gagne.apres += f.apres;
+  }
+  console.info(`[NOVA-7] Décor fusionné : ${gagne.avant} maillages -> ${gagne.apres} objets.`);
   buildDust();
   buildLightPool();
 

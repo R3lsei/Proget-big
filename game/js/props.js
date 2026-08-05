@@ -83,6 +83,14 @@ export function initProps() {
       color: 0x0d1a17, emissive: 0x2fe0a0, emissiveIntensity: 0.8, roughness: 0.15,
     }),
   };
+  // Palette fixe de réactifs : un matériau cloné par fiole empêcherait toute
+  // fusion (la fusion se fait par matériau). Six teintes suffisent à l'illusion.
+  P.liquides = [0.08, 0.16, 0.3, 0.45, 0.55, 0.78].map((teinte) => {
+    const m = P.liquid.clone();
+    m.color = new THREE.Color().setHSL(teinte, 0.72, 0.5);
+    m.emissive = m.color.clone().multiplyScalar(0.35);
+    return m;
+  });
   return P;
 }
 
@@ -103,9 +111,8 @@ export function beaker(height = 0.16, radius = 0.05, filled = true) {
   g.add(glass);
   if (filled) {
     const lvl = height * (0.3 + Math.random() * 0.35);
-    const liq = mesh(new THREE.CylinderGeometry(radius * 0.87, radius * 0.87, lvl, 20), p.liquid.clone());
-    liq.material.color = new THREE.Color().setHSL(0.25 + Math.random() * 0.5, 0.7, 0.5);
-    liq.material.emissive = liq.material.color.clone().multiplyScalar(0.4);
+    const liq = mesh(new THREE.CylinderGeometry(radius * 0.87, radius * 0.87, lvl, 20),
+                     p.liquides[(Math.random() * p.liquides.length) | 0]);
     liq.position.y = 0.02 + lvl / 2;
     g.add(liq);
   }
@@ -128,9 +135,8 @@ export function testTubeRack(count = 5) {
       [0, 0], [0.014, 0.006], [0.014, 0.1], [0.012, 0.1], [0.012, 0.008], [0, 0.004],
     ], 14), p.glass, x, 0.03, 0);
     g.add(tube);
-    const liq = mesh(new THREE.CylinderGeometry(0.0115, 0.0115, 0.035, 14), p.liquid.clone(), x, 0.05, 0);
-    liq.material.color = new THREE.Color().setHSL(Math.random(), 0.75, 0.5);
-    liq.material.emissive = liq.material.color.clone().multiplyScalar(0.35);
+    const liq = mesh(new THREE.CylinderGeometry(0.0115, 0.0115, 0.035, 14),
+                     p.liquides[(Math.random() * p.liquides.length) | 0], x, 0.05, 0);
     g.add(liq);
   }
   return g;

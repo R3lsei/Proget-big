@@ -7,6 +7,8 @@ import {
   spawnGeneratedProp,
 } from './world.js';
 import { RoomEnvironment } from '../lib/RoomEnvironment.js';
+import { EXRLoader } from '../lib/EXRLoader.js';
+import labHdri from '../lib/assets/lab-hdri.js';
 import { requestRealModel } from './tripo.js';
 import { Player } from './player.js';
 import { loadModel, openScanner, closeScanner, captureStableObject, onDetectionAnnounce } from './vision.js';
@@ -33,9 +35,24 @@ const camera = new THREE.PerspectiveCamera(72, window.innerWidth / window.innerH
 // Éclairage par image d'environnement : les reflets sur l'inox, le chrome et
 // la verrerie viennent d'une vraie carte d'irradiance, pas d'un simple ambient.
 // C'est ce qui distingue une surface métallique d'un aplat gris.
+//
+// On démarre sur un environnement procédural — disponible immédiatement, donc
+// la première image est déjà correcte — puis on le remplace par un vrai HDRI
+// de laboratoire dès qu'il est décodé. Si le décodage échoue, le procédural
+// reste en place et le jeu ne perd rien.
 const pmrem = new THREE.PMREMGenerator(renderer);
+pmrem.compileEquirectangularShader();
 scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-pmrem.dispose();
+
+new EXRLoader().load(labHdri, (texture) => {
+  texture.mapping = THREE.EquirectangularReflectionMapping;
+  const cible = pmrem.fromEquirectangular(texture);
+  scene.environment = cible.texture;
+  texture.dispose();
+  console.info('[NOVA-7] Environnement HDRI de laboratoire chargé.');
+}, undefined, () => {
+  console.info('[NOVA-7] HDRI indisponible, environnement procédural conservé.');
+});
 
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
@@ -48,7 +65,7 @@ const player = new Player(camera, renderer.domElement);
 
 // Console de développement : NOVA.debug = true permet de jouer sans pointer lock.
 window.NOVA = {
-  player, state, colliders, debug: false,
+  player, state, colliders, renderer, scene, debug: false,
   // Répliques prononcées cette partie : copiez-les pour générer les voix
   // manquantes (voir python cli.py elevenlabs voices --from-json).
   spokenLines: () => JSON.stringify(spokenLines, null, 2),
