@@ -12,10 +12,11 @@
 ### T-001 · Exécuter le banc de mesure
 **Bloque tout le reste.** Aucune ligne de gameplay ne sera écrite avant.
 
+Double-cliquez sur `MESURER-LA-DETECTION-Windows.bat` (ou `.command` sur Mac),
+ou en ligne de commande depuis la racine :
+
 ```bash
-cd tools/spike-detection
-python3 -m http.server 8000
-# puis ouvrir http://localhost:8000
+python mesurer.py
 ```
 
 1. Cliquer « Charger le modèle » (premier chargement long, c'est mesuré)

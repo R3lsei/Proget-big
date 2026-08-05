@@ -7,10 +7,17 @@ documents de conception — c'est la tâche T-001, bloquante.
 
 ## Lancer
 
+**Le plus simple** — double-cliquez à la racine du projet :
+
+- Windows : `MESURER-LA-DETECTION-Windows.bat`
+- macOS / Linux : `MESURER-LA-DETECTION-Mac-Linux.command`
+
+Le navigateur s'ouvre tout seul.
+
+En ligne de commande :
+
 ```bash
-cd tools/spike-detection
-python3 -m http.server 8000
-# puis ouvrir http://localhost:8000
+python mesurer.py          # depuis la racine du projet
 ```
 
 Une connexion internet est nécessaire : la bibliothèque et les poids du modèle
