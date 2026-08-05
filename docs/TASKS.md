@@ -30,14 +30,18 @@ Ce que ça décide :
 
 ---
 
-## 🟡 Prêt à démarrer (après T-001)
+## 🟡 Prêt à démarrer
 
 | ID | Tâche | Dépend de |
 |---|---|---|
-| T-002 | Harnais de test JS exécutable en CI (< 2 s) | — |
-| T-003 | Verrouiller les 3 non-régressions connues | T-002 |
-| T-004 | Vérification automatique des règles de dépendance | T-002 |
-| T-005 | Seuils de performance bloquants en CI | T-002 |
+| T-003 | Verrouiller les 3 non-régressions connues | T-002 ✅ |
+| T-004 | Vérification automatique des règles de dépendance | T-002 ✅ |
+| T-005 | Seuils de performance bloquants en CI | T-002 ✅ |
+
+> T-003 exige d'extraire la résolution de collisions de `player.js` vers un
+> module `physics/` indépendant de three : la logique porte sur des boîtes
+> englobantes (six nombres), pas sur une bibliothèque de rendu. C'est à la fois
+> le test de non-régression et le premier pas de la migration.
 
 ## ⚪ Jalon 2 — Le cœur du jeu
 
@@ -59,6 +63,7 @@ Ce que ça décide :
 | T-000 | Conception validée (7 axes) | SPEC, GAMEPLAY, ARCHITECTURE écrits |
 | T-000b | Faisabilité open-vocabulary | transformers.js v4.2.0 disponible, bundle autonome 510 Ko, WebGPU détecté |
 | T-000c | Banc de mesure livré | `tools/spike-detection/`, zéro erreur JS |
+| T-002 | Harnais de test JS | 18 tests, 0,5 s, **zéro dépendance**. Lanceur natif Node, résolveur `three` vers la copie vendorée, exécution en CI (JS + Python) |
 
 ---
 

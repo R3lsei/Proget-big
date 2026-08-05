@@ -1,0 +1,37 @@
+# Barrière de qualité : aucun commit ne passe si les tests échouent.
+# TEST_PLAN.md définit ce qui est vérifié et pourquoi.
+
+name: Tests
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+jobs:
+  javascript:
+    name: Tests JavaScript
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      # Aucun `npm install` : le harnais n'a délibérément aucune dépendance.
+      # three est résolu vers la copie vendorée du jeu — on teste exactement
+      # la version que le joueur exécute.
+      - name: Exécuter les tests
+        run: npm test
+
+  python:
+    name: Tests Python
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Installer les dépendances
+        run: pip install -r requirements.txt
+      - name: Exécuter les tests
+        run: python -m unittest discover tests -v

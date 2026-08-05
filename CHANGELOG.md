@@ -6,6 +6,11 @@ Versionnement [SemVer](https://semver.org/lang/fr/).
 ## [Non publié]
 
 ### Ajouté
+- **Harnais de test JavaScript** (T-002) : 18 tests en 0,5 s, sans aucune
+  dépendance de développement. Lanceur natif de Node, résolveur du spécificateur
+  `three` vers la copie vendorée du jeu, exécution automatique en CI pour
+  JavaScript et Python. Première suite : le moteur de règles objet → capacités,
+  verrouillé avant sa migration vers `perception/affordances.js`.
 - **Conception NOVA-7 validée** sur sept axes : périmètre 4-6 h, détection
   open-vocabulary, structure puzzle-box, plateforme web puis desktop, système
   de propriétés hybride, garantie de résolubilité, restructuration sans réécriture.

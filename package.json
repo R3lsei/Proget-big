@@ -1,0 +1,15 @@
+{
+  "name": "nova-7",
+  "version": "0.1.0",
+  "description": "NOVA-7 — jeu d'énigmes à détection d'objets réels par webcam",
+  "type": "module",
+  "private": true,
+  "license": "UNLICENSED",
+  "scripts": {
+    "test": "node --import ./tests/js/enregistrer-resolveur.mjs --test \"tests/js/*.test.js\"",
+    "test:watch": "node --import ./tests/js/enregistrer-resolveur.mjs --test --watch \"tests/js/*.test.js\""
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
