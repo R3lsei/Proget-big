@@ -1,0 +1,53 @@
+// Papeterie, bureau, documents.
+//
+// `porte_texte` demande « un texte lisible de plus de quelques mots ». Un stylo
+// n'en porte pas — sa marque ne fait pas un texte. Un livre, un plan, une notice
+// oui. Le seuil est volontairement haut : c'est cette propriété qui déclenche les
+// énigmes de code et d'information, et la brader les rendrait triviales.
+
+export const BUREAU = {
+  'livre':              { a: 'un',  p: ['plat', 'rigide', 'lourd', 'porte_texte', 'inflammable', 'tenable_une_main'] },
+  'carnet':             { a: 'un',  p: ['plat', 'souple', 'porte_texte', 'inflammable', 'absorbant', 'leger', 'tenable_une_main'] },
+  'cahier':             { a: 'un',  p: ['plat', 'souple', 'porte_texte', 'inflammable', 'absorbant', 'leger', 'tenable_une_main'] },
+  'feuille de papier':  { a: 'une', p: ['plat', 'mince', 'souple', 'porte_texte', 'inflammable', 'absorbant', 'leger'] },
+  'journal':            { a: 'un',  p: ['plat', 'souple', 'porte_texte', 'inflammable', 'absorbant', 'leger'] },
+  'magazine':           { a: 'un',  p: ['plat', 'souple', 'porte_texte', 'inflammable', 'leger'] },
+  'plan':               { a: 'un',  p: ['plat', 'mince', 'souple', 'porte_texte', 'inflammable', 'leger'], syn: ['carte', 'schéma'] },
+  'notice':             { a: 'une', p: ['plat', 'mince', 'souple', 'porte_texte', 'inflammable', 'leger'], syn: ['mode d\'emploi'] },
+  'dossier':            { a: 'un',  p: ['plat', 'souple', 'porte_texte', 'inflammable', 'leger'], syn: ['chemise cartonnée'] },
+  'classeur':           { a: 'un',  p: ['plat', 'rigide', 'porte_texte', 'lourd', 'inflammable'] },
+  'enveloppe':          { a: 'une', p: ['plat', 'mince', 'souple', 'porte_texte', 'inflammable', 'leger'] },
+  'carte postale':      { a: 'une', p: ['plat', 'mince', 'rigide', 'porte_texte', 'inflammable', 'leger'] },
+  'affiche':            { a: 'une', p: ['plat', 'mince', 'souple', 'porte_texte', 'inflammable', 'leger'] },
+  'étiquette':          { a: 'une', p: ['plat', 'mince', 'souple', 'porte_texte', 'leger'] },
+  'stylo':              { a: 'un',  p: ['rigide', 'allonge', 'mince', 'pointu', 'leger', 'tenable_une_main'] },
+  'crayon':             { a: 'un',  p: ['rigide', 'allonge', 'mince', 'pointu', 'inflammable', 'leger', 'tenable_une_main'] },
+  'feutre':             { a: 'un',  p: ['rigide', 'allonge', 'mince', 'odorant', 'leger', 'tenable_une_main'] },
+  'marqueur':           { a: 'un',  p: ['rigide', 'allonge', 'odorant', 'leger', 'tenable_une_main'] },
+  'gomme':              { a: 'une', p: ['souple', 'leger', 'tenable_une_main'] },
+  'taille-crayon':      { a: 'un',  p: ['tranchant', 'rigide', 'conducteur', 'leger', 'tenable_une_main'] },
+  'agrafeuse':          { a: 'une', p: ['rigide', 'lourd', 'conducteur', 'magnetique', 'tenable_une_main'] },
+  'agrafe':             { a: 'une', p: ['pointu', 'mince', 'souple', 'conducteur', 'magnetique', 'leger'] },
+  'punaise':            { a: 'une', p: ['pointu', 'mince', 'rigide', 'conducteur', 'magnetique', 'leger'] },
+  'élastique':          { a: 'un',  p: ['souple', 'allonge', 'mince', 'inflammable', 'leger'] },
+  'colle':              { a: 'de la', p: ['souple', 'contient_liquide', 'odorant', 'inflammable', 'leger', 'tenable_une_main'] },
+  'ciseaux de bureau':  { a: 'des', p: ['tranchant', 'pointu', 'rigide', 'mince', 'conducteur', 'leger', 'tenable_une_main'] },
+  'coupe-papier':       { a: 'un',  p: ['tranchant', 'pointu', 'rigide', 'allonge', 'mince', 'conducteur', 'tenable_une_main'] },
+  'tampon encreur':     { a: 'un',  p: ['rigide', 'porte_texte', 'contient_liquide', 'tenable_une_main'] },
+  'post-it':            { a: 'un',  p: ['plat', 'mince', 'souple', 'porte_texte', 'inflammable', 'leger'] },
+  'surligneur':        { a: 'un',  p: ['rigide', 'allonge', 'odorant', 'leger', 'tenable_une_main'] },
+  'calepin':            { a: 'un',  p: ['plat', 'souple', 'porte_texte', 'inflammable', 'leger', 'tenable_une_main'] },
+  'rapporteur':         { a: 'un',  p: ['plat', 'mince', 'rigide', 'porte_texte', 'reflechissant', 'leger', 'tenable_une_main'] },
+  'compas':             { a: 'un',  p: ['pointu', 'rigide', 'allonge', 'mince', 'conducteur', 'magnetique', 'leger', 'tenable_une_main'] },
+  'équerre':            { a: 'une', p: ['plat', 'mince', 'rigide', 'porte_texte', 'leger', 'tenable_une_main'] },
+  'porte-documents':    { a: 'un',  p: ['plat', 'rigide', 'creux', 'porte_texte'], syn: ['mallette'] },
+  'corbeille à papier': { a: 'une', p: ['creux', 'rigide', 'leger'] },
+  'lampe de poche de bureau': { a: 'une', p: ['rigide', 'allonge', 'electronique', 'alimente', 'emet_lumiere', 'tenable_une_main'] },
+  'trousse':            { a: 'une', p: ['souple', 'creux', 'inflammable', 'leger', 'tenable_une_main'] },
+  'badge nominatif':    { a: 'un',  p: ['plat', 'mince', 'rigide', 'porte_texte', 'leger', 'tenable_une_main'] },
+  'carte de visite':    { a: 'une', p: ['plat', 'mince', 'rigide', 'porte_texte', 'inflammable', 'leger'] },
+  'billet de banque':   { a: 'un',  p: ['plat', 'mince', 'souple', 'porte_texte', 'inflammable', 'leger'] },
+  'pièce de monnaie':   { a: 'une', p: ['plat', 'mince', 'rigide', 'conducteur', 'porte_texte', 'reflechissant', 'leger', 'tenable_une_main'] },
+  'agenda':             { a: 'un',  p: ['plat', 'souple', 'porte_texte', 'mesure_temps', 'inflammable', 'tenable_une_main'] },
+  'calendrier':         { a: 'un',  p: ['plat', 'mince', 'souple', 'porte_texte', 'mesure_temps', 'inflammable', 'leger'] },
+};

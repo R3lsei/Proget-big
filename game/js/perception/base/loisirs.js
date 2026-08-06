@@ -1,0 +1,45 @@
+// Sport, jeux, musique, bagages, objets de loisir.
+//
+// Beaucoup de projectiles : `leger` + `tenable_une_main` est la signature de ce
+// qui se lance, donc de la diversion. C'est la catégorie qui garantit qu'un
+// joueur sans outil sous la main dispose quand même d'une solution.
+
+export const LOISIRS = {
+  'ballon':            { a: 'un',  p: ['souple', 'creux', 'leger', 'tenable_une_main'] },
+  'balle de tennis':   { a: 'une', p: ['souple', 'leger', 'appetissant_animal', 'tenable_une_main'] },
+  'balle de golf':     { a: 'une', p: ['rigide', 'lourd', 'leger', 'tenable_une_main'] },
+  'frisbee':           { a: 'un',  p: ['plat', 'rigide', 'souple', 'leger', 'tenable_une_main'] },
+  'raquette':          { a: 'une', p: ['plat', 'rigide', 'allonge', 'tenable_une_main'] },
+  'batte de baseball': { a: 'une', p: ['rigide', 'allonge', 'lourd', 'inflammable'] },
+  'corde à sauter':    { a: 'une', p: ['souple', 'allonge', 'mince', 'inflammable', 'tenable_une_main'] },
+  'haltère':           { a: 'un',  p: ['rigide', 'lourd', 'conducteur', 'magnetique', 'tenable_une_main'] },
+  'tapis de sport':    { a: 'un',  p: ['souple', 'plat', 'allonge', 'inflammable'] },
+  'skateboard':        { a: 'un',  p: ['plat', 'rigide', 'allonge', 'lourd', 'inflammable'] },
+  'vélo':              { a: 'un',  p: ['rigide', 'lourd', 'conducteur', 'magnetique'] },
+  'casque de vélo':    { a: 'un',  p: ['rigide', 'creux', 'leger', 'tenable_une_main'] },
+  'gourde de sport':   { a: 'une', p: ['souple', 'creux', 'contient_liquide', 'tenable_une_main'] },
+  'sifflet':           { a: 'un',  p: ['creux', 'rigide', 'emet_son', 'conducteur', 'leger', 'tenable_une_main'] },
+  'jumelles':          { a: 'des', p: ['rigide', 'creux', 'reflechissant', 'tenable_une_main'] },
+  'appareil à musique': { a: 'un', p: ['rigide', 'electronique', 'alimente', 'emet_son', 'tenable_une_main'], syn: ['baladeur', 'lecteur mp3'] },
+  'guitare':           { a: 'une', p: ['creux', 'rigide', 'allonge', 'inflammable', 'emet_son'] },
+  'flûte':             { a: 'une', p: ['creux', 'rigide', 'allonge', 'mince', 'conducteur', 'emet_son', 'tenable_une_main'] },
+  'tambour':           { a: 'un',  p: ['creux', 'rigide', 'emet_son'] },
+  'harmonica':         { a: 'un',  p: ['rigide', 'allonge', 'creux', 'conducteur', 'emet_son', 'leger', 'tenable_une_main'] },
+  'cloche':            { a: 'une', p: ['creux', 'rigide', 'conducteur', 'emet_son', 'lourd', 'tenable_une_main'] },
+  'jeu de cartes':     { a: 'un',  p: ['plat', 'mince', 'rigide', 'porte_texte', 'inflammable', 'leger', 'tenable_une_main'] },
+  'dé':                { a: 'un',  p: ['rigide', 'porte_texte', 'leger', 'tenable_une_main'] },
+  'puzzle':            { a: 'un',  p: ['plat', 'mince', 'rigide', 'inflammable', 'leger'] },
+  'figurine':          { a: 'une', p: ['rigide', 'leger', 'tenable_une_main'] },
+  'peluche':           { a: 'une', p: ['souple', 'absorbant', 'inflammable', 'appetissant_animal', 'leger', 'tenable_une_main'] },
+  'ours en peluche':   { a: 'un',  p: ['souple', 'absorbant', 'inflammable', 'appetissant_animal', 'leger', 'tenable_une_main'] },
+  'cerf-volant':       { a: 'un',  p: ['souple', 'plat', 'mince', 'inflammable', 'leger'] },
+  'bulle de savon':    { a: 'des', p: ['contient_liquide', 'reflechissant', 'leger'] },
+  'ballon de baudruche': { a: 'un', p: ['souple', 'creux', 'inflammable', 'leger', 'tenable_une_main'] },
+  'sac de couchage':   { a: 'un',  p: ['souple', 'creux', 'allonge', 'absorbant', 'inflammable', 'isolant_thermique'] },
+  'tente':             { a: 'une', p: ['souple', 'creux', 'inflammable', 'absorbant', 'lourd'] },
+  'lampe frontale':    { a: 'une', p: ['rigide', 'electronique', 'alimente', 'emet_lumiere', 'leger', 'tenable_une_main'] },
+  'couteau suisse':    { a: 'un',  p: ['tranchant', 'pointu', 'rigide', 'mince', 'conducteur', 'magnetique', 'leger', 'tenable_une_main'] },
+  'mousqueton':        { a: 'un',  p: ['rigide', 'creux', 'conducteur', 'magnetique', 'leger', 'tenable_une_main'] },
+  'sifflet de secours': { a: 'un', p: ['creux', 'rigide', 'emet_son', 'leger', 'tenable_une_main'] },
+  'boussole de randonnée': { a: 'une', p: ['rigide', 'plat', 'magnetique', 'porte_texte', 'leger', 'tenable_une_main'] },
+};

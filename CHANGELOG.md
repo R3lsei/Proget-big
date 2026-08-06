@@ -6,6 +6,13 @@ Versionnement [SemVer](https://semver.org/lang/fr/).
 ## [Non publié]
 
 ### Ajouté
+- **Base curatée d'objets français** (T-011) : 408 objets en 9 catégories
+  relisibles séparément, 444 entrées interrogeables avec les synonymes. Chaque
+  objet est décrit par ses propriétés physiques, jamais par ses usages. La
+  recherche absorbe casse, accents, articles et pluriels, parce que le libellé
+  vient de trois sources qui n'écrivent pas pareil. Un test garantit que chaque
+  propriété du vocabulaire est portée par au moins un objet : sans lui, une
+  affordance pourrait devenir inatteignable et rendre une énigme insoluble.
 - **Vocabulaire de propriétés physiques** (T-010) : 30 propriétés observables en
   7 familles, socle du passage `objet → propriétés → affordances`. Une propriété
   décrit un fait vérifiable (`tranchant`), jamais un usage (`peutCouper`) : c'est

@@ -1,0 +1,61 @@
+// Ustensiles, vaisselle, contenants de cuisine.
+//
+// `contient_liquide` est ici une propriété **d'état, pas de forme** : le critère
+// demande si l'objet transporte un liquide « en cet instant ». Une bouteille
+// vide est `creux` sans être `contient_liquide`. Le jeu ne pouvant pas voir
+// l'intérieur d'un contenant opaque, la convention est de considérer comme plein
+// ce qui est habituellement présenté plein (bouteille, canette) et comme vide ce
+// qu'on montre habituellement vide (casserole, saladier).
+
+export const CUISINE = {
+  'fourchette':        { a: 'une', p: ['pointu', 'rigide', 'allonge', 'mince', 'conducteur', 'magnetique', 'leger', 'tenable_une_main'] },
+  'cuillère':          { a: 'une', p: ['creux', 'rigide', 'allonge', 'conducteur', 'magnetique', 'leger', 'tenable_une_main'] },
+  'couteau de cuisine': { a: 'un', p: ['tranchant', 'pointu', 'rigide', 'allonge', 'mince', 'conducteur', 'tenable_une_main'] },
+  'éplucheur':         { a: 'un',  p: ['tranchant', 'rigide', 'allonge', 'conducteur', 'leger', 'tenable_une_main'] },
+  'ouvre-boîte':       { a: 'un',  p: ['tranchant', 'pointu', 'rigide', 'conducteur', 'magnetique', 'tenable_une_main'] },
+  'tire-bouchon':      { a: 'un',  p: ['pointu', 'rigide', 'allonge', 'mince', 'conducteur', 'magnetique', 'tenable_une_main'] },
+  'décapsuleur':       { a: 'un',  p: ['rigide', 'plat', 'conducteur', 'magnetique', 'leger', 'tenable_une_main'] },
+  'râpe':              { a: 'une', p: ['tranchant', 'rigide', 'creux', 'conducteur', 'magnetique', 'tenable_une_main'] },
+  'fouet':             { a: 'un',  p: ['souple', 'allonge', 'conducteur', 'magnetique', 'leger', 'tenable_une_main'] },
+  'spatule':           { a: 'une', p: ['plat', 'souple', 'allonge', 'leger', 'tenable_une_main'] },
+  'louche':            { a: 'une', p: ['creux', 'rigide', 'allonge', 'conducteur', 'tenable_une_main'] },
+  'rouleau à pâtisserie': { a: 'un', p: ['rigide', 'allonge', 'lourd', 'tenable_une_main'] },
+  'planche à découper': { a: 'une', p: ['plat', 'rigide', 'inflammable', 'tenable_une_main'] },
+  'assiette':          { a: 'une', p: ['plat', 'rigide', 'cassant', 'tenable_une_main'] },
+  'bol':               { a: 'un',  p: ['creux', 'rigide', 'cassant', 'tenable_une_main'] },
+  'saladier':          { a: 'un',  p: ['creux', 'rigide', 'cassant'] },
+  'tasse':             { a: 'une', p: ['creux', 'rigide', 'cassant', 'contient_liquide', 'tenable_une_main'] },
+  'mug':               { a: 'un',  p: ['creux', 'rigide', 'cassant', 'contient_liquide', 'porte_texte', 'tenable_une_main'] },
+  'verre':             { a: 'un',  p: ['creux', 'cassant', 'reflechissant', 'contient_liquide', 'tenable_une_main'] },
+  'bouteille':         { a: 'une', p: ['creux', 'cassant', 'contient_liquide', 'porte_texte', 'tenable_une_main'] },
+  'bouteille en plastique': { a: 'une', p: ['creux', 'souple', 'contient_liquide', 'porte_texte', 'leger', 'tenable_une_main'] },
+  'gourde':            { a: 'une', p: ['creux', 'rigide', 'contient_liquide', 'isolant_thermique', 'tenable_une_main'] },
+  'thermos':           { a: 'un',  p: ['creux', 'rigide', 'contient_liquide', 'isolant_thermique', 'conducteur', 'tenable_une_main'] },
+  'canette':           { a: 'une', p: ['creux', 'souple', 'conducteur', 'contient_liquide', 'porte_texte', 'leger', 'tenable_une_main'] },
+  'carafe':            { a: 'une', p: ['creux', 'cassant', 'reflechissant', 'contient_liquide'] },
+  'théière':           { a: 'une', p: ['creux', 'rigide', 'cassant', 'contient_liquide', 'odorant'] },
+  'casserole':         { a: 'une', p: ['creux', 'rigide', 'lourd', 'conducteur', 'magnetique'] },
+  'poêle':             { a: 'une', p: ['creux', 'plat', 'rigide', 'lourd', 'conducteur', 'magnetique'] },
+  'marmite':           { a: 'une', p: ['creux', 'rigide', 'lourd', 'conducteur', 'magnetique'] },
+  'passoire':          { a: 'une', p: ['creux', 'rigide', 'conducteur', 'leger', 'tenable_une_main'] },
+  'boîte de conserve': { a: 'une', p: ['creux', 'rigide', 'conducteur', 'magnetique', 'porte_texte', 'tenable_une_main'] },
+  'bocal':             { a: 'un',  p: ['creux', 'cassant', 'reflechissant', 'porte_texte', 'tenable_une_main'] },
+  'papier aluminium':  { a: 'du',  p: ['souple', 'mince', 'plat', 'conducteur', 'reflechissant', 'leger'] },
+  'film plastique':    { a: 'du',  p: ['souple', 'mince', 'plat', 'inflammable', 'leger'] },
+  'éponge':            { a: 'une', p: ['souple', 'absorbant', 'leger', 'tenable_une_main'] },
+  'torchon':           { a: 'un',  p: ['souple', 'plat', 'absorbant', 'inflammable', 'isolant_thermique', 'leger'] },
+  'gant de cuisine':   { a: 'un',  p: ['souple', 'absorbant', 'isolant_thermique', 'inflammable', 'leger'] },
+  'bouilloire':        { a: 'une', p: ['creux', 'rigide', 'electronique', 'contient_liquide', 'emet_son'] },
+  'grille-pain':       { a: 'un',  p: ['creux', 'rigide', 'electronique', 'conducteur', 'lourd'] },
+  'mixeur':            { a: 'un',  p: ['tranchant', 'creux', 'rigide', 'electronique', 'emet_son', 'lourd'] },
+  'micro-ondes':       { a: 'un',  p: ['creux', 'rigide', 'electronique', 'lourd', 'porte_texte', 'emet_son'] },
+  'balance de cuisine': { a: 'une', p: ['plat', 'rigide', 'electronique', 'alimente', 'porte_texte', 'tenable_une_main'] },
+  'minuteur':          { a: 'un',  p: ['rigide', 'electronique', 'alimente', 'mesure_temps', 'emet_son', 'porte_texte', 'leger', 'tenable_une_main'] },
+  'allume-gaz':        { a: 'un',  p: ['rigide', 'allonge', 'inflammable', 'emet_lumiere', 'leger', 'tenable_une_main'] },
+  'salière':           { a: 'une', p: ['creux', 'rigide', 'cassant', 'leger', 'tenable_une_main'] },
+  'bouchon de liège':  { a: 'un',  p: ['souple', 'absorbant', 'inflammable', 'leger', 'tenable_une_main'] },
+  'paille':            { a: 'une', p: ['creux', 'allonge', 'mince', 'souple', 'inflammable', 'leger'] },
+  'baguette chinoise': { a: 'une', p: ['pointu', 'rigide', 'allonge', 'mince', 'inflammable', 'leger', 'tenable_une_main'] },
+  'plateau':           { a: 'un',  p: ['plat', 'rigide', 'leger'] },
+  'nappe':             { a: 'une', p: ['souple', 'plat', 'absorbant', 'inflammable', 'leger'] },
+};
