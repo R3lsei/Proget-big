@@ -6,6 +6,13 @@ Versionnement [SemVer](https://semver.org/lang/fr/).
 ## [Non publié]
 
 ### Ajouté
+- **Vocabulaire de propriétés physiques** (T-010) : 30 propriétés observables en
+  7 familles, socle du passage `objet → propriétés → affordances`. Une propriété
+  décrit un fait vérifiable (`tranchant`), jamais un usage (`peutCouper`) : c'est
+  ce qui permettra à un objet jamais prévu d'être utile. Chaque propriété porte
+  un critère formulé en question fermée, contrat commun à la base curatée et au
+  repli sémantique. Gelé en profondeur, versionné, 21 tests dont une empreinte
+  exacte de la liste.
 - **Module de physique indépendant** (T-003) : la résolution de collisions
   quitte `player.js` pour `physics/`, opérant sur des boîtes de six nombres
   plutôt que sur des `THREE.Box3`. La physique ne dépend plus du rendu et se
@@ -34,6 +41,12 @@ Versionnement [SemVer](https://semver.org/lang/fr/).
 - Épreuve de la conduite de vapeur et secret du casier du gardien.
 
 ### Modifié
+- **Le banc de mesure ne bloque plus le développement** (T-001 abandonné). Trois
+  tentatives, aucune mesure obtenue : le coût a dépassé le bénéfice. Le jeu est
+  désormais conçu pour le pire cas — scan lent, animation d'attente soignée — et
+  mesurera lui-même sa latence en cours de partie (T-016). La durée d'animation
+  devient un paramètre ajusté à l'exécution, pas une hypothèse figée dans le code.
+  Le banc reste disponible dans `tools/` pour qui veut le lancer.
 - **Appels de dessin : 1414 → 337** (−76 %) par fusion des géométries statiques
   zone par zone. Maillages en scène : 844 → 213.
 - Refonte visuelle : laboratoire blanc lumineux remplaçant l'ambiance sombre.

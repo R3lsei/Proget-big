@@ -3,31 +3,7 @@
 > Tâches actives. Une seule fonctionnalité à la fois, validée avant la suivante.
 > Vue d'ensemble : [ROADMAP.md](ROADMAP.md).
 
-**Jalon courant : 0 — Lever l'incertitude**
-
----
-
-## 🔴 En attente de vous
-
-### T-001 · Exécuter le banc de mesure
-**Bloque tout le reste.** Aucune ligne de gameplay ne sera écrite avant.
-
-Double-cliquez sur `MESURER-LA-DETECTION-Windows.bat` (ou `.command` sur Mac),
-ou en ligne de commande depuis la racine :
-
-```bash
-python mesurer.py
-```
-
-1. Cliquer « Charger le modèle » (premier chargement long, c'est mesuré)
-2. Activer la caméra, montrer quelques objets
-3. Cliquer « Mesurer 10 inférences »
-4. **Me communiquer le bloc « Chiffres à reporter »**
-
-Ce que ça décide :
-- médiane < 300 ms → scan instantané, ergonomie simple
-- 300-1000 ms → scan à la demande + animation d'attente soignée
-- \> 1000 ms → changement de modèle ou bascule sur l'approche hybride
+**Jalon courant : 2 — Le cœur du jeu**
 
 ---
 
@@ -43,10 +19,10 @@ Ce que ça décide :
 
 | ID | Tâche | Dépend de |
 |---|---|---|
-| T-010 | Vocabulaire de propriétés (gelé, versionné) | T-002 |
-| T-011 | Base curatée ~500 objets français | T-010 |
+| T-011 | Base curatée ~500 objets français | T-010 ✅ |
 | T-012 | Moteur d'affordances (fonctions pures) | T-010 |
-| T-013 | Repli sémantique hors base | T-011, T-001 |
+| T-013 | Repli sémantique hors base | T-011 |
+| T-016 | Mesure embarquée de la latence de scan | T-012 |
 | T-014 | **Test de résolubilité bloquant** | T-012 |
 | T-015 | Grammaire d'énigmes et chargeur de salles | T-012 |
 
@@ -56,9 +32,11 @@ Ce que ça décide :
 
 | ID | Tâche | Résultat |
 |---|---|---|
+| T-001 | Banc de mesure hors-ligne | **Abandonné.** Trois tentatives, aucune mesure obtenue : session ONNX refusée, puis page servie depuis le cache. Le coût a dépassé le bénéfice. Remplacé par T-016, qui mesure la même chose sans rien demander au joueur. Le banc reste dans `tools/` pour qui veut. Décision assumée : on conçoit pour le pire cas (scan lent), l'ergonomie s'adapte à la mesure réelle |
 | T-000 | Conception validée (7 axes) | SPEC, GAMEPLAY, ARCHITECTURE écrits |
 | T-000b | Faisabilité open-vocabulary | transformers.js v4.2.0 disponible, bundle autonome 510 Ko, WebGPU détecté |
 | T-000c | Banc de mesure livré | `tools/spike-detection/`, zéro erreur JS |
+| T-010 | Vocabulaire de propriétés | 30 propriétés en 7 familles, gelé en profondeur, versionné 1.0.0. Chaque propriété est un **fait observable**, formulé en question fermée : même contrat pour la base curatée et pour le repli sémantique. 21 tests, dont un test d'empreinte qui rend toute modification volontaire. Verrouillage vérifié par mutation : 4 régressions sur 4 sont détectées |
 | T-003 | Module `physics/` extrait + B-001 verrouillé | 15 tests de collision. Colliders passés en boîtes plates : la physique ne dépend plus de three. A révélé B-014 (traversée sur déplacement long), corrigé |
 | T-002 | Harnais de test JS | 18 tests, 0,5 s, **zéro dépendance**. Lanceur natif Node, résolveur `three` vers la copie vendorée, exécution en CI (JS + Python) |
 
