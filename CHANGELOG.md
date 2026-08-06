@@ -6,6 +6,18 @@ Versionnement [SemVer](https://semver.org/lang/fr/).
 ## [Non publié]
 
 ### Ajouté
+- **Végétation à base de vrais modèles** (T-021) : le feuillage procédural a été
+  tenté trois fois et a donné, dans l'ordre, du confetti vert, un feu d'artifice
+  et des roseaux clairsemés. La structure était juste, l'approche ne l'était pas :
+  une plante générée par formule ne fait pas illusion.
+  Chaîne d'assets établie de bout en bout — récupération de modèles libres,
+  simplification, compression Draco et WebP, instanciation. La plante passe de
+  5,8 Mo à 1,1 Mo, et sa version lointaine à 516 Ko pour 12 % des triangles :
+  répéter le modèle détaillé au fond d'une salle coûtait 5,7 millions de
+  triangles pour des plantes hautes de quinze pixels.
+  Un massif coûte un appel de dessin par partie du modèle, jamais un par plante.
+  Les licences sont vérifiées par un test : l'oubli de déclarer la version
+  dérivée en CC-BY a été rattrapé dix minutes après avoir été commis.
 - **Direction artistique et kit modulaire** (T-020) : refonte de la carte engagée,
   en chambres fermées style Portal, futuriste et végétalisé. Le lieu a deux états
   — cœur entretenu, périphérie envahie — et la progression bascule de l'un à
