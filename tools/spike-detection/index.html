@@ -68,6 +68,11 @@
       d'inférence sur <em>votre</em> machine, et la justesse sur <em>vos</em> objets.
       Aucune image ne quitte votre ordinateur.
     </p>
+    <p style="font-size:.85rem">
+      <!-- Estampille de version : sans elle, impossible de distinguer un vrai
+           échec d'une page servie depuis le cache du navigateur. -->
+      Version du banc : <strong id="version">2 — échelle de repli</strong>
+    </p>
   </header>
 
   <section>
@@ -396,7 +401,7 @@ $('btn-copier').addEventListener('click', async () => {
   const environnement = [...document.querySelectorAll('#env tbody tr')]
     .map((tr) => '  ' + [...tr.children].map((td) => td.textContent).join(' : '))
     .join('\n');
-  const texte = `NOVA-7 — banc de mesure\n\n`
+  const texte = `NOVA-7 — banc de mesure (version ${$('version').textContent})\n\n`
     + `Environnement :\n${environnement}\n\n`
     + `Journal :\n${journal.textContent || '  (vide)'}`;
   try {

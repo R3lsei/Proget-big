@@ -41,6 +41,18 @@ Versionnement [SemVer](https://semver.org/lang/fr/).
 - Lumières : 25 sources → pool de 6 suivant le joueur, coût de shader constant.
 
 ### Corrigé
+- **Banc de mesure servi depuis le cache du navigateur** (B-015) : `mesurer.py`
+  n'envoyait aucun en-tête de cache, laissant le navigateur appliquer une
+  fraîcheur heuristique et resservir une version périmée sans même revalider.
+  Un correctif livré paraissait alors sans effet. Corrigé par `no-store` côté
+  serveur *et* par un paramètre d'URL unique à chaque lancement — le premier
+  seul ne suffit pas, puisqu'il n'agit que sur les réponses qui partent
+  réellement. Une estampille de version est désormais affichée sur la page.
+- **Échec de chargement du modèle sans repli ni diagnostic** (B-016) : le banc
+  ne tentait qu'une configuration et tronquait le message d'erreur à 60
+  caractères, ce qui ne laissait voir qu'un chemin de compilation d'ONNX
+  Runtime. Il descend maintenant une échelle de quatre combinaisons
+  matériel/précision et journalise chaque refus en entier.
 - **Traversée d'obstacle sur déplacement long** (B-014) : trouvé par les tests
   de T-003, jamais observé en jeu. Un pas plus long que le gabarit du joueur
   franchissait un mur sans le détecter — invisible à 120 FPS, atteignable sur
