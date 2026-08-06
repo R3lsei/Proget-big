@@ -23,6 +23,8 @@
 | T-016 | Mesure embarquée de la latence de scan | T-012 ✅ |
 | T-015 | Grammaire d'énigmes et chargeur de salles | T-012 ✅ |
 | T-017 | Transformation d'objets (briser un objet cassant → tesson tranchant) | T-012 ✅ |
+| T-021 | Végétation crédible : vrais modèles 3D instanciés | T-020 ✅ |
+| T-022 | Chambres déclarées : un fichier, deux lecteurs (bâtisseur + vérificateur) | T-020 ✅, T-014 ✅ |
 
 ---
 
@@ -34,6 +36,7 @@
 | T-000 | Conception validée (7 axes) | SPEC, GAMEPLAY, ARCHITECTURE écrits |
 | T-000b | Faisabilité open-vocabulary | transformers.js v4.2.0 disponible, bundle autonome 510 Ko, WebGPU détecté |
 | T-000c | Banc de mesure livré | `tools/spike-detection/`, zéro erreur JS |
+| T-020 | Kit modulaire et direction artistique | Refonte de la carte engagée : grille de 1,2 m, panneaux à joints creux, verrières, un soleil unique porteur d'ombres à la place de vingt lampes ponctuelles. Deux états du lieu — cœur soigné, périphérie envahie. Palette gelée en trois familles. 24 tests verrouillant les invariants invisibles à l'œil : matériaux partagés, feuillage instancié, décor déterministe, lierre plaqué. **Végétation encore insuffisante** — voir T-021 |
 | T-014 | **Résolubilité bloquante** | Prouve qu'une salle est franchissable avec ses seuls objets. Le cœur n'est pas une suite de vérifications mais un **couplage maximal** : deux plaques simultanées peuvent avoir la même unique brique pour solution — chacune satisfaisable, l'ensemble non. Refuse de conclure au-delà de 16 mécanismes plutôt que d'annoncer une preuve non exhaustive. Branché en CI (`npm run verifier`), bloquant au même titre qu'un test. 22 tests ; mutation, 7 régressions sur 7 détectées après correction d'un test non discriminant |
 | T-019 | Portage d'objets contraints | Prendre, transporter, poser. Réutilise le résolveur de collisions de T-003 : un objet porté ne traverse pas un mur, et rompt s'il reste bloqué plutôt que d'être tenu à travers la géométrie. Lissage indépendant de la fréquence d'images — même geste à 60 et à 120 FPS. Aimantation sur réceptacle sans rien accorder sur la condition. 25 tests ; mutation, 7 régressions sur 7 détectées après correction d'un test non discriminant |
 | T-018 | Mécanismes physiques | 10 réceptacles (plaque de pression, borne de pontage, fente, rail magnétique, cellule optique…) exprimés dans le même vocabulaire de propriétés que les affordances : un cube du décor et une brique montrée à la caméra passent par la même règle. La grammaire de conditions, sortie vers `utils/`, sert désormais aussi aux circuits de portes — une porte s'écrit comme une affordance, sans code nouveau. 24 tests ; mutation, 5 régressions sur 5 détectées |

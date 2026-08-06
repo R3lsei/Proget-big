@@ -6,6 +6,19 @@ Versionnement [SemVer](https://semver.org/lang/fr/).
 ## [Non publié]
 
 ### Ajouté
+- **Direction artistique et kit modulaire** (T-020) : refonte de la carte engagée,
+  en chambres fermées style Portal, futuriste et végétalisé. Le lieu a deux états
+  — cœur entretenu, périphérie envahie — et la progression bascule de l'un à
+  l'autre : c'est le décor qui raconte depuis combien de temps le complexe tourne
+  sans personne.
+  Le changement technique décisif est l'éclairage : **un soleil unique traversant
+  des verrières**, au lieu de vingt lampes ponctuelles. Une seule carte d'ombre au
+  lieu de vingt, et des ombres portées franches — la correction du défaut le plus
+  visible de l'ancienne carte, où chaque objet semblait collé au sol plutôt que
+  posé dessus.
+  Règle qui prime sur l'esthétique : le décor n'occulte jamais un élément
+  interactif. Une liane devant une plaque de pression, et le joueur cherche pour
+  une mauvaise raison sans jamais savoir pourquoi. Un test l'interdit.
 - **Garantie de résolubilité** (T-014) : une salle impossible ne plante pas, ne
   lève rien, et ne se découvre qu'après des heures de jeu perdues — le joueur
   cherche une solution inexistante puis abandonne en se croyant en tort. Le
