@@ -6,6 +6,14 @@ Versionnement [SemVer](https://semver.org/lang/fr/).
 ## [Non publié]
 
 ### Ajouté
+- **Moteur d'affordances** (T-012) : 25 actions déduites des seules propriétés
+  physiques. Aucune règle ne nomme un objet — un tournevis crochète parce qu'il
+  est mince et allongé, pas parce qu'une ligne le dit. Les conditions sont des
+  **données** et non des fonctions : elles se traduisent en indices (« il vous
+  faut quelque chose de mince, allongé et pas lourd »), s'inversent pour vérifier
+  qu'une énigme a une solution, et se relisent. Une gradation de qualité permet à
+  l'objet improvisé de fonctionner sans valoir l'outil idéal, ce qui récompense
+  l'ingéniosité sans jamais transformer une bonne idée en impasse.
 - **Base curatée d'objets français** (T-011) : 408 objets en 9 catégories
   relisibles séparément, 444 entrées interrogeables avec les synonymes. Chaque
   objet est décrit par ses propriétés physiques, jamais par ses usages. La
@@ -61,6 +69,18 @@ Versionnement [SemVer](https://semver.org/lang/fr/).
 - Lumières : 25 sources → pool de 6 suivant le joueur, coût de shader constant.
 
 ### Corrigé
+- **Dix objets réels sans aucun usage** (B-017) : plateau, assiette, planche à
+  découper, ruban adhésif, interrupteur et cinq autres étaient reconnus puis
+  rejetés — l'instant exact où le joueur cesse de croire au système. Deux causes :
+  deux actions manquaient au moteur (`se protéger`, `attiser`) et sept objets
+  avaient des propriétés physiques oubliées. Trouvé par un test, pas en jeu.
+- **Branche de règle morte dans `couper`** (B-018) : la condition acceptait
+  `tranchant et (rigide ou cassant)`, mais aucun objet réel n'est tranchant *et*
+  cassant — un verre ne coupe qu'une fois brisé. La branche anticipait une
+  transformation inexistante (T-017) et n'était donc jamais exécutée.
+- **Indice trompeur sur les conditions imbriquées** (B-019) : « magnétique ou
+  électronique et communicant » se lisait à l'envers de la règle. Les
+  sous-conditions composées sont désormais parenthésées.
 - **Banc de mesure servi depuis le cache du navigateur** (B-015) : `mesurer.py`
   n'envoyait aucun en-tête de cache, laissant le navigateur appliquer une
   fraîcheur heuristique et resservir une version périmée sans même revalider.

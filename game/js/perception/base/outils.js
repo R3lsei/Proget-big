@@ -40,7 +40,7 @@ export const OUTILS = {
   'corde':              { a: 'une', p: ['souple', 'allonge', 'inflammable', 'absorbant'] },
   'ficelle':            { a: 'de la', p: ['souple', 'allonge', 'mince', 'inflammable', 'leger'] },
   'chaîne':             { a: 'une', p: ['souple', 'allonge', 'lourd', 'conducteur', 'magnetique'] },
-  'ruban adhésif':      { a: 'du',  p: ['souple', 'mince', 'inflammable', 'leger'], syn: ['scotch', 'adhésif'] },
+  'ruban adhésif':      { a: 'du',  p: ['souple', 'mince', 'allonge', 'inflammable', 'leger', 'tenable_une_main'], syn: ['scotch', 'adhésif'] },
   'mètre ruban':        { a: 'un',  p: ['souple', 'mince', 'allonge', 'porte_texte', 'conducteur', 'magnetique', 'tenable_une_main'] },
   'règle':              { a: 'une', p: ['rigide', 'plat', 'allonge', 'mince', 'porte_texte', 'leger', 'tenable_une_main'] },
   'niveau à bulle':     { a: 'un',  p: ['rigide', 'allonge', 'contient_liquide', 'porte_texte', 'tenable_une_main'] },

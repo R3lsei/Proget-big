@@ -19,11 +19,11 @@
 
 | ID | Tâche | Dépend de |
 |---|---|---|
-| T-012 | Moteur d'affordances (fonctions pures) | T-010 ✅, T-011 ✅ |
 | T-013 | Repli sémantique hors base | T-011 ✅ |
-| T-016 | Mesure embarquée de la latence de scan | T-012 |
-| T-014 | **Test de résolubilité bloquant** | T-012 |
-| T-015 | Grammaire d'énigmes et chargeur de salles | T-012 |
+| T-016 | Mesure embarquée de la latence de scan | T-012 ✅ |
+| T-014 | **Test de résolubilité bloquant** | T-012 ✅ |
+| T-015 | Grammaire d'énigmes et chargeur de salles | T-012 ✅ |
+| T-017 | Transformation d'objets (briser un objet cassant → tesson tranchant) | T-012 ✅ |
 
 ---
 
@@ -35,6 +35,7 @@
 | T-000 | Conception validée (7 axes) | SPEC, GAMEPLAY, ARCHITECTURE écrits |
 | T-000b | Faisabilité open-vocabulary | transformers.js v4.2.0 disponible, bundle autonome 510 Ko, WebGPU détecté |
 | T-000c | Banc de mesure livré | `tools/spike-detection/`, zéro erreur JS |
+| T-012 | Moteur d'affordances | 25 actions déduites de règles déclaratives, jamais d'une table objet → usage. Conditions en données : elles s'expliquent au joueur, s'inversent pour le test de résolubilité, et se relisent. Gradation de qualité pour que l'objet improvisé fonctionne sans valoir l'outil idéal. 31 tests, dont 5 confrontant les règles à la base réelle — ils ont trouvé une branche morte et 10 objets sans usage. Verrouillage vérifié par mutation, 6 régressions sur 6 détectées |
 | T-011 | Base curatée d'objets français | 408 objets en 9 catégories, 444 entrées avec synonymes. Chaque propriété du vocabulaire est portée par au moins un objet — aucune affordance n'est inatteignable. Recherche tolérante : casse, accents, articles, pluriels. 22 tests ; verrouillage vérifié par mutation, 5 régressions sur 5 détectées |
 | T-010 | Vocabulaire de propriétés | 30 propriétés en 7 familles, gelé en profondeur, versionné 1.0.0. Chaque propriété est un **fait observable**, formulé en question fermée : même contrat pour la base curatée et pour le repli sémantique. 21 tests, dont un test d'empreinte qui rend toute modification volontaire. Verrouillage vérifié par mutation : 4 régressions sur 4 sont détectées |
 | T-003 | Module `physics/` extrait + B-001 verrouillé | 15 tests de collision. Colliders passés en boîtes plates : la physique ne dépend plus de three. A révélé B-014 (traversée sur déplacement long), corrigé |

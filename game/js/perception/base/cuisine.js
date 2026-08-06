@@ -41,7 +41,7 @@ export const CUISINE = {
   'boîte de conserve': { a: 'une', p: ['creux', 'rigide', 'conducteur', 'magnetique', 'porte_texte', 'tenable_une_main'] },
   'bocal':             { a: 'un',  p: ['creux', 'cassant', 'reflechissant', 'porte_texte', 'tenable_une_main'] },
   'papier aluminium':  { a: 'du',  p: ['souple', 'mince', 'plat', 'conducteur', 'reflechissant', 'leger'] },
-  'film plastique':    { a: 'du',  p: ['souple', 'mince', 'plat', 'inflammable', 'leger'] },
+  'film plastique':    { a: 'du',  p: ['souple', 'mince', 'plat', 'allonge', 'inflammable', 'leger', 'tenable_une_main'] },
   'éponge':            { a: 'une', p: ['souple', 'absorbant', 'leger', 'tenable_une_main'] },
   'torchon':           { a: 'un',  p: ['souple', 'plat', 'absorbant', 'inflammable', 'isolant_thermique', 'leger'] },
   'gant de cuisine':   { a: 'un',  p: ['souple', 'absorbant', 'isolant_thermique', 'inflammable', 'leger'] },
@@ -56,6 +56,6 @@ export const CUISINE = {
   'bouchon de liège':  { a: 'un',  p: ['souple', 'absorbant', 'inflammable', 'leger', 'tenable_une_main'] },
   'paille':            { a: 'une', p: ['creux', 'allonge', 'mince', 'souple', 'inflammable', 'leger'] },
   'baguette chinoise': { a: 'une', p: ['pointu', 'rigide', 'allonge', 'mince', 'inflammable', 'leger', 'tenable_une_main'] },
-  'plateau':           { a: 'un',  p: ['plat', 'rigide', 'leger'] },
+  'plateau':           { a: 'un',  p: ['plat', 'rigide', 'leger', 'tenable_une_main'] },
   'nappe':             { a: 'une', p: ['souple', 'plat', 'absorbant', 'inflammable', 'leger'] },
 };
