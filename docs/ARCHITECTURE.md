@@ -30,7 +30,7 @@ ne connaît jamais un module d'un étage supérieur.
 | Module | Responsabilité | Ne connaît jamais |
 |---|---|---|
 | `core/` | Bus d'événements, machine à états, horloge, journal, conteneur de services | tout le reste |
-| `utils/` | Maths, structures, aides pures. **Aucun état.** | tout le reste |
+| `utils/` | Maths, structures, grammaire de conditions, aides pures. **Aucun état.** | tout le reste |
 | `perception/` | Caméra, inférence, propriétés, affordances | rendu, UI, gameplay |
 | `gameplay/` | Énigmes, prédicats, règles de résolution, progression | rendu, UI |
 | `inventory/` | Objets matérialisés, consommation, état | rendu, UI |

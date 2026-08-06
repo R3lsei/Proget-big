@@ -11,32 +11,18 @@
 // résolubilité (T-014) devra demander « quels objets savent couper ? », ce qui
 // serait impossible si les règles étaient enfouies dans le code du gameplay.
 //
-// ─── Pourquoi les conditions sont des données, pas des fonctions ─────────────
-// Une condition écrite en `(p) => p.has('tranchant') && p.has('rigide')` serait
-// plus courte. Mais elle serait opaque : impossible d'en tirer un indice pour le
-// joueur (« il vous faut quelque chose de tranchant et de rigide »), impossible
-// de l'inverser pour vérifier qu'une énigme a une solution, impossible de
-// l'afficher dans un outil de conception. Une condition déclarative se lit, se
-// retourne et s'explique.
+// Les règles s'écrivent dans la grammaire de conditions du socle
+// (`utils/conditions.js`), qui explique pourquoi elles sont des données et non
+// des fonctions.
 
-/**
- * Grammaire des conditions.
- *
- *   'tranchant'                    la propriété est présente
- *   { toutes: [...] }              toutes les sous-conditions
- *   { auMoins: [...] }             au moins une sous-condition
- *   { sans: [...] }                aucune des sous-conditions
- *
- * Les formes se composent librement. `evaluer` est la seule fonction qui
- * connaisse cette grammaire.
- */
-export function evaluer(condition, proprietes) {
-  if (typeof condition === 'string') return proprietes.has(condition);
-  if (condition.toutes) return condition.toutes.every((c) => evaluer(c, proprietes));
-  if (condition.auMoins) return condition.auMoins.some((c) => evaluer(c, proprietes));
-  if (condition.sans) return !condition.sans.some((c) => evaluer(c, proprietes));
-  throw new Error(`Condition mal formée : ${JSON.stringify(condition)}`);
-}
+import { evaluer, feuilles, expliquer } from '../utils/conditions.js';
+
+// Réexportés : la grammaire appartient au socle, mais rien n'oblige les
+// appelants du moteur d'affordances à connaître deux modules pour une règle.
+export { evaluer, expliquer };
+
+/** Propriétés citées par une condition, quelle que soit sa profondeur. */
+export const proprietesCitees = feuilles;
 
 /**
  * Les actions du monde de NOVA-7.
@@ -267,66 +253,6 @@ export function permet(idAffordance, proprietes) {
   if (!affordance) return false;
   const ensemble = proprietes instanceof Set ? proprietes : new Set(proprietes ?? []);
   return evaluer(affordance.requiert, ensemble);
-}
-
-/**
- * Propriétés citées par une condition, quelle que soit sa profondeur.
- *
- * Sert au test de résolubilité et aux indices : savoir de quoi parle une règle
- * sans avoir à l'exécuter sur toutes les combinaisons possibles.
- */
-export function proprietesCitees(condition, accumulateur = new Set()) {
-  if (typeof condition === 'string') {
-    accumulateur.add(condition);
-    return accumulateur;
-  }
-  for (const branche of condition.toutes ?? condition.auMoins ?? condition.sans ?? []) {
-    proprietesCitees(branche, accumulateur);
-  }
-  return accumulateur;
-}
-
-/**
- * Traduit une condition en français, pour les indices donnés au joueur.
- *
- * Le jeu ne dira jamais « il vous faut un couteau » — ce serait avouer que la
- * réponse était dans une liste. Il dira « il vous faut quelque chose de tranchant
- * et de rigide », ce qui laisse au joueur le mérite de trouver l'objet, et lui
- * ouvre toutes les solutions plutôt qu'une seule.
- */
-export function expliquer(condition, libelleDe = (id) => id) {
-  if (typeof condition === 'string') return libelleDe(condition);
-  const sous = (branches) => branches.map((c) => parentheser(c, libelleDe));
-  if (condition.toutes) return joindre(sous(condition.toutes), 'et');
-  if (condition.auMoins) return joindre(sous(condition.auMoins), 'ou');
-  if (condition.sans) {
-    const morceaux = sous(condition.sans);
-    // « pas X » au singulier, « ni X ni Y » au pluriel : le français ne tolère
-    // pas « ni lourd » tout seul.
-    return morceaux.length === 1 ? `pas ${morceaux[0]}` : `ni ${morceaux.join(' ni ')}`;
-  }
-  throw new Error(`Condition mal formée : ${JSON.stringify(condition)}`);
-}
-
-/**
- * Parenthèse une sous-condition composée.
- *
- * Sans elles, « magnétique ou électronique et communicant » se lit exactement à
- * l'envers de ce que la règle exige. Un indice qui trompe est pire que pas
- * d'indice : le joueur cherche alors dans la mauvaise direction, avec la
- * conviction d'avoir compris.
- */
-function parentheser(condition, libelleDe) {
-  const texte = expliquer(condition, libelleDe);
-  const composee = typeof condition === 'object'
-    && (condition.toutes ?? condition.auMoins ?? []).length > 1;
-  return composee ? `(${texte})` : texte;
-}
-
-function joindre(morceaux, liaison) {
-  if (morceaux.length === 0) return '';
-  if (morceaux.length === 1) return morceaux[0];
-  return `${morceaux.slice(0, -1).join(', ')} ${liaison} ${morceaux.at(-1)}`;
 }
 
 /**

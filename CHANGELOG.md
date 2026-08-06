@@ -6,6 +6,16 @@ Versionnement [SemVer](https://semver.org/lang/fr/).
 ## [Non publié]
 
 ### Ajouté
+- **Mécanismes physiques** (T-018) : dix réceptacles — plaque de pression, borne
+  de pontage, fente de lecteur, rail magnétique, cellule optique, déversoir… Ce
+  second pilier de jeu se joue **sans aucun objet réel**, ce qui corrige une
+  dépendance que la conception n'avait pas traitée : jusqu'ici, un joueur sans
+  rien sous la main était bloqué.
+  Les deux piliers n'en font qu'un : un réceptacle n'accepte pas « un cube », il
+  accepte une condition sur des propriétés. Un cube du décor et une brique montrée
+  à la caméra passent par la même règle, et le vocabulaire ne sert qu'une fois.
+  La plaque de pression refuse le poids du joueur — sans quoi il suffirait de se
+  tenir dessus, la porte s'ouvrirait, et il ne pourrait pas la franchir.
 - **Moteur d'affordances** (T-012) : 25 actions déduites des seules propriétés
   physiques. Aucune règle ne nomme un objet — un tournevis crochète parce qu'il
   est mince et allongé, pas parce qu'une ligne le dit. Les conditions sont des
@@ -56,6 +66,12 @@ Versionnement [SemVer](https://semver.org/lang/fr/).
 - Épreuve de la conduite de vapeur et secret du casier du gardien.
 
 ### Modifié
+- **Grammaire de conditions déplacée vers le socle** (`utils/conditions.js`).
+  Écrite pour les affordances, elle s'est révélée valable pour tout ensemble de
+  faits : une porte qui s'ouvre sur deux plaques enfoncées s'écrit exactement
+  comme une règle d'objet, et s'explique avec la même fonction. La laisser dans
+  `perception/` aurait forcé le gameplay à dépendre de la perception pour une
+  simple structure logique. Aucun comportement changé, 106 tests toujours verts.
 - **Le banc de mesure ne bloque plus le développement** (T-001 abandonné). Trois
   tentatives, aucune mesure obtenue : le coût a dépassé le bénéfice. Le jeu est
   désormais conçu pour le pire cas — scan lent, animation d'attente soignée — et
