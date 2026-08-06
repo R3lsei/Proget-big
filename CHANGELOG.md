@@ -6,6 +6,15 @@ Versionnement [SemVer](https://semver.org/lang/fr/).
 ## [Non publié]
 
 ### Ajouté
+- **Portage d'objets** (T-019) : prendre, transporter et poser, ce qui rend
+  jouables les mécanismes de T-018 — sans portage, une plaque de pression n'est
+  qu'une règle qu'on ne peut pas déclencher. Objets contraints : pas de rotation
+  ni de roulement, comme dans Portal et pour la même raison — un objet parti sous
+  un décor rend la salle insoluble, et le joueur ne peut pas distinguer un bug de
+  sa propre impasse. L'objet porté passe par le résolveur de collisions du joueur :
+  impossible de traverser un mur en le poussant devant soi. Le lissage du suivi
+  est indépendant de la fréquence d'images, sans quoi l'objet collerait à la vue
+  à 120 FPS et traînerait à 60.
 - **Mécanismes physiques** (T-018) : dix réceptacles — plaque de pression, borne
   de pontage, fente de lecteur, rail magnétique, cellule optique, déversoir… Ce
   second pilier de jeu se joue **sans aucun objet réel**, ce qui corrige une
