@@ -121,6 +121,12 @@
 
   <section>
     <h2>Journal</h2>
+    <p style="font-size:.9rem">
+      En cas d'échec, ce journal contient la cause exacte. Copiez-le entier.
+    </p>
+    <div class="row" style="margin-bottom:.8rem">
+      <button id="btn-copier" class="ghost">Copier le journal</button>
+    </div>
     <div id="journal"></div>
   </section>
 
@@ -178,18 +184,35 @@ async function decrireEnvironnement() {
 
 // ---------------------------------------------------------------- 2. modèle
 const MODELE = 'Xenova/owlv2-base-patch16-ensemble';
+
+/**
+ * Combinaisons tentées dans l'ordre, de la plus rapide à la plus compatible.
+ *
+ * OWLv2 en pleine précision pèse plusieurs centaines de Mo : selon la machine,
+ * ONNX Runtime échoue à créer sa session (mémoire, backend, format non
+ * supporté). Plutôt que d'abandonner au premier refus, on redescend en gamme.
+ * Le but du banc est de savoir ce qui MARCHE ici, pas de valider un idéal.
+ */
+const TENTATIVES = [
+  { device: 'webgpu', dtype: 'fp16', libelle: 'WebGPU · demi-précision' },
+  { device: 'webgpu', dtype: 'q8',   libelle: 'WebGPU · quantifié 8 bits' },
+  { device: 'wasm',   dtype: 'q8',   libelle: 'WASM · quantifié 8 bits' },
+  { device: 'wasm',   dtype: 'fp32', libelle: 'WASM · pleine précision' },
+];
+
 let detecteur = null;
 let octetsTelecharges = 0;
 
-async function charger(backend) {
+async function charger(tentative) {
   env.allowLocalModels = false;
   octetsTelecharges = 0;
 
   const t0 = performance.now();
-  log(`Chargement de ${MODELE} (backend : ${backend})…`);
+  log(`Essai : ${tentative.libelle}…`);
 
   detecteur = await pipeline('zero-shot-object-detection', MODELE, {
-    device: backend,
+    device: tentative.device,
+    dtype: tentative.dtype,
     progress_callback: (p) => {
       if (p.status === 'progress' && p.total) {
         octetsTelecharges = Math.max(octetsTelecharges, p.loaded);
@@ -198,40 +221,61 @@ async function charger(backend) {
     },
   });
 
-  const duree = performance.now() - t0;
-  log(`Chargé en ${(duree / 1000).toFixed(1)} s.`);
-  return duree;
+  return performance.now() - t0;
 }
 
 $('btn-charger').addEventListener('click', async () => {
   const btn = $('btn-charger');
   btn.disabled = true;
-  btn.textContent = 'Chargement…';
   $('chargement').querySelector('tbody').innerHTML = '';
 
-  const { webgpu } = etat;
-  const backend = webgpu ? 'webgpu' : 'wasm';
-  try {
-    const duree = await charger(backend);
-    ligne('chargement', 'Backend retenu', backend, 'ok');
-    ligne('chargement', 'Temps de chargement', (duree / 1000).toFixed(1) + ' s',
-          duree < 15000 ? 'ok' : duree < 40000 ? 'warn' : 'bad');
-    if (octetsTelecharges) {
-      ligne('chargement', 'Téléchargé', (octetsTelecharges / 1048576).toFixed(1) + ' Mo');
-    } else {
-      ligne('chargement', 'Téléchargé', 'depuis le cache navigateur', 'ok');
+  const candidats = etat.webgpu ? TENTATIVES : TENTATIVES.filter((t) => t.device === 'wasm');
+  const echecs = [];
+
+  for (const tentative of candidats) {
+    btn.textContent = `Chargement — ${tentative.libelle}…`;
+    try {
+      const duree = await charger(tentative);
+      log(`Chargé en ${(duree / 1000).toFixed(1)} s.`);
+
+      ligne('chargement', 'Configuration retenue', tentative.libelle, 'ok');
+      ligne('chargement', 'Temps de chargement', (duree / 1000).toFixed(1) + ' s',
+            duree < 15000 ? 'ok' : duree < 40000 ? 'warn' : 'bad');
+      ligne('chargement', 'Téléchargé', octetsTelecharges
+        ? (octetsTelecharges / 1048576).toFixed(1) + ' Mo'
+        : 'depuis le cache navigateur', octetsTelecharges ? '' : 'ok');
+      if (echecs.length) {
+        ligne('chargement', 'Configurations refusées', echecs.length, 'warn');
+      }
+
+      Object.assign(etat, {
+        charge: true,
+        backend: tentative.libelle,
+        dureeChargement: duree,
+      });
+      $('btn-camera').disabled = false;
+      btn.textContent = 'Modèle chargé';
+      return;
+    } catch (e) {
+      // Message COMPLET : ONNX Runtime encode la cause réelle en fin de chaîne,
+      // après un long chemin de compilation. Le tronquer perd l'information.
+      const msg = (e && e.message) ? e.message : String(e);
+      echecs.push(`${tentative.libelle} → ${msg}`);
+      log(`  ✗ ${tentative.libelle} refusé :`);
+      log(`    ${msg}`);
     }
-    etat.charge = true;
-    etat.backend = backend;
-    etat.dureeChargement = duree;
-    $('btn-camera').disabled = false;
-    btn.textContent = 'Modèle chargé';
-  } catch (e) {
-    log('ÉCHEC : ' + e.message);
-    ligne('chargement', 'Résultat', 'échec — ' + e.message.slice(0, 60), 'bad');
-    btn.disabled = false;
-    btn.textContent = 'Réessayer';
   }
+
+  ligne('chargement', 'Résultat', 'aucune configuration ne fonctionne', 'bad');
+  for (const e of echecs) {
+    const [conf, ...reste] = e.split(' → ');
+    ligne('chargement', conf, reste.join(' → '), 'bad');
+  }
+  log('');
+  log('Toutes les configurations ont échoué. Copiez ce journal entier :');
+  log('il contient la cause exacte, nécessaire pour décider de la suite.');
+  btn.disabled = false;
+  btn.textContent = 'Réessayer';
 });
 
 $('btn-vider').addEventListener('click', async () => {
@@ -343,6 +387,26 @@ function rendreVerdict() {
       inférence médiane ${median.toFixed(0)} ms, p90 ${etat.p90.toFixed(0)} ms.
     </p>`;
 }
+
+// ---------------------------------------------------------------- copie du journal
+$('btn-copier').addEventListener('click', async () => {
+  const btn = $('btn-copier');
+  // on joint l'environnement au journal : sans lui, un diagnostic est aveugle
+  // (nom explicite : `env` est déjà l'espace de configuration de transformers.js)
+  const environnement = [...document.querySelectorAll('#env tbody tr')]
+    .map((tr) => '  ' + [...tr.children].map((td) => td.textContent).join(' : '))
+    .join('\n');
+  const texte = `NOVA-7 — banc de mesure\n\n`
+    + `Environnement :\n${environnement}\n\n`
+    + `Journal :\n${journal.textContent || '  (vide)'}`;
+  try {
+    await navigator.clipboard.writeText(texte);
+    btn.textContent = 'Copié';
+  } catch (_) {
+    btn.textContent = 'Échec — sélectionnez le texte à la main';
+  }
+  setTimeout(() => { btn.textContent = 'Copier le journal'; }, 2500);
+});
 
 // ---------------------------------------------------------------- amorçage
 const etat = { webgpu: false, charge: false, backend: null, median: null, p90: null, dureeChargement: 0 };
