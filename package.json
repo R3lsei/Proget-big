@@ -7,7 +7,9 @@
   "license": "UNLICENSED",
   "scripts": {
     "test": "node --import ./tests/js/enregistrer-resolveur.mjs --test \"tests/js/*.test.js\"",
-    "test:watch": "node --import ./tests/js/enregistrer-resolveur.mjs --test --watch \"tests/js/*.test.js\""
+    "test:watch": "node --import ./tests/js/enregistrer-resolveur.mjs --test --watch \"tests/js/*.test.js\"",
+    "verifier": "node tools/verifier-salles.mjs",
+    "valider": "npm test && npm run verifier"
   },
   "engines": {
     "node": ">=20"

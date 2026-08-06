@@ -23,6 +23,11 @@ jobs:
       - name: Exécuter les tests
         run: npm test
 
+      # Une salle impossible ne plante pas et ne lève rien : elle se découvre
+      # après des heures de jeu perdues. Elle doit donc bloquer comme un test.
+      - name: Vérifier la résolubilité des salles
+        run: npm run verifier
+
   python:
     name: Tests Python
     runs-on: ubuntu-latest

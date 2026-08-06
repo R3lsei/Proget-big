@@ -6,6 +6,18 @@ Versionnement [SemVer](https://semver.org/lang/fr/).
 ## [Non publié]
 
 ### Ajouté
+- **Garantie de résolubilité** (T-014) : une salle impossible ne plante pas, ne
+  lève rien, et ne se découvre qu'après des heures de jeu perdues — le joueur
+  cherche une solution inexistante puis abandonne en se croyant en tort. Le
+  vérificateur prouve qu'un chemin existe avec les seuls objets présents, et
+  bloque la CI sinon. Il ne se contente pas de vérifier chaque exigence
+  séparément : deux plaques à maintenir en même temps peuvent avoir la même
+  unique brique pour solution, cas où chacune est satisfaisable mais pas
+  l'ensemble. C'est un couplage maximal, avec relogement — une affectation
+  gloutonne déclarerait insolubles des salles qui ne le sont pas.
+  Au-delà de seize mécanismes, il refuse de conclure plutôt que d'annoncer une
+  preuve qui n'en serait plus une. Sur une liste de salles vide, il annonce
+  explicitement n'avoir rien vérifié : « zéro échec » n'est pas une preuve.
 - **Portage d'objets** (T-019) : prendre, transporter et poser, ce qui rend
   jouables les mécanismes de T-018 — sans portage, une plaque de pression n'est
   qu'une règle qu'on ne peut pas déclencher. Objets contraints : pas de rotation
