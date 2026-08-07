@@ -22,6 +22,7 @@ import { chercher } from '../perception/base/index.js';
 import {
   MODULE, HAUTEUR_CHAMBRE,
   sol, mur, murPerce, porte, verriere, jardiniere, lierre, socleReceptacle, materiaux,
+  borneTerminal, passerelle,
 } from './kit.js';
 
 /**
@@ -114,6 +115,42 @@ export function batir(chambre) {
     });
   }
 
+  const terminaux = new Map();
+  for (const [instance, decl] of Object.entries(chambre.terminaux ?? {})) {
+    const borne = borneTerminal({ etat });
+    borne.position.set(enMetres(decl.x ?? 0), 0, enMetres(decl.z ?? 0));
+    groupe.add(borne);
+    borne.updateMatrixWorld(true);
+    terminaux.set(instance, {
+      type: decl.type,
+      boite: depuisBox3(new THREE.Box3().setFromObject(borne)),
+      borne,
+    });
+    // La borne est un obstacle : on ne traverse pas une console.
+    ajouterColliders(borne, colliders);
+  }
+
+  const passerelles = new Map();
+  for (const decl of chambre.passerelles ?? []) {
+    const pont = passerelle({
+      largeur: decl.largeur ?? 2, longueur: decl.longueur ?? 3, etat,
+    });
+    pont.position.set(enMetres(decl.x ?? 0), 0, enMetres(decl.z ?? 0));
+    groupe.add(pont);
+    pont.updateMatrixWorld(true);
+    passerelles.set(decl.id, {
+      condition: decl.condition,
+      groupe: pont,
+      deployer: pont.userData.deployer,
+      // Le collider n'est pas ajouté à la liste : il n'existe que déployé, et
+      // c'est la boucle de jeu qui l'y met. Un pont rentré sur lequel on marche
+      // quand même serait le pire des deux mondes.
+      collider: depuisCentre(
+        enMetres(decl.x ?? 0), 0.06, enMetres(decl.z ?? 0),
+        (decl.largeur ?? 2) * MODULE, 0.12, (decl.longueur ?? 3) * MODULE),
+    });
+  }
+
   for (const decor of chambre.decor ?? []) {
     const piece = decor.type === 'lierre'
       ? lierre({ largeur: decor.largeur ?? 4, densite: decor.densite ?? 40, graine: decor.graine ?? 1 })
@@ -130,6 +167,8 @@ export function batir(chambre) {
     groupe,
     colliders,
     receptacles,
+    terminaux,
+    passerelles,
     objets: poserObjets(chambre, groupe),
     porte: { groupe: vantaux, ouvrir: vantaux.userData.ouvrir },
   };

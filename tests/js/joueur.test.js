@@ -10,7 +10,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { CHAMBRES } from '../../game/js/gameplay/chambres.js';
-import { receptaclesActifs, circuitOuvert } from '../../game/js/gameplay/mecanismes.js';
+import {
+  receptaclesActifs, circuitOuvert, enclencher, faitsDeChambre, declenchePar,
+} from '../../game/js/gameplay/mecanismes.js';
 import { batir, departDe } from '../../game/js/rendering/batisseur.js';
 import { PORTEE_SAISIE } from '../../game/js/physics/portage.js';
 import { MODULE } from '../../game/js/rendering/kit.js';
@@ -233,11 +235,12 @@ test('un objet tenu en main n\'active pas la plaque qu\'il survole', () => {
     'un objet tenu suffit à ouvrir la porte');
 });
 
-test('la serre exige deux objets distincts', () => {
-  // La chambre est prouvée soluble ; ce test vérifie qu'elle l'est PAR LE JEU,
-  // et qu'un seul objet ne suffit pas.
+test('la serre exige deux objets distincts ET la passerelle', () => {
+  // La chaîne complète : deux plaques lestées, plus un terminal enclenché qui
+  // sort le pont. Chacune des trois conditions seule ne suffit pas.
   const { chambre, joueur, objets, bati } = partie(1);
   const instances = [...bati.receptacles.keys()];
+  let enclenches = new Set();
 
   const poser = (nomObjet, instance) => {
     const corps = bati.objets.get(nomObjet);
@@ -247,19 +250,47 @@ test('la serre exige deux objets distincts', () => {
     corps.y = recep.boite.maxY;
     corps.vy = 0;
   };
+  const ouverte = () => circuitOuvert(chambre.sortie, faitsDeChambre(
+    receptaclesActifs(occupations(joueur, objets, bati.receptacles)),
+    enclenches, bati.passerelles));
 
-  poser('brique', instances[0]);
   teleporter(joueur, 0, 3);
+  poser('brique', instances[0]);
   simuler(joueur, objets, bati, 0.3);
-  let actifs = receptaclesActifs(occupations(joueur, objets, bati.receptacles));
-  assert.equal(circuitOuvert(chambre.sortie, actifs), false,
-    'une seule plaque suffit alors que la sortie en exige deux');
+  assert.equal(ouverte(), false, 'une seule plaque suffit alors qu\'il en faut deux');
 
   poser('pot de fleurs', instances[1]);
   simuler(joueur, objets, bati, 0.3);
-  actifs = receptaclesActifs(occupations(joueur, objets, bati.receptacles));
-  assert.equal(circuitOuvert(chambre.sortie, actifs), true,
-    'deux objets lourds distincts n\'ouvrent pas la sortie');
+  assert.equal(ouverte(), false, 'les plaques ouvrent la sortie sans la passerelle');
+
+  enclenches = enclencher(enclenches, 'boitier');
+  simuler(joueur, objets, bati, 0.3);
+  assert.equal(ouverte(), true, 'la chaîne complète n\'ouvre pas la sortie');
+});
+
+test('le boîtier se ponte avec un simple tournevis, sans informatique', () => {
+  // Deux voies pour la même passerelle : la console exige un appareil
+  // programmable, le boîtier seulement de quoi relier deux contacts. Un joueur
+  // sans téléphone n'est donc jamais bloqué.
+  const { bati } = partie(1);
+  const tournevis = bati.objets.get('tournevis');
+  assert.equal(declenchePar('boitier_commande', tournevis.proprietes), true);
+  assert.equal(declenchePar('console_reseau', tournevis.proprietes), false,
+    'un tournevis pirate une console réseau');
+});
+
+test('un terminal enclenché le reste quand on en déclenche un autre', () => {
+  // Sans verrouillage, il faudrait rester planté devant la console pendant que
+  // la passerelle est sortie — donc ne jamais pouvoir l'emprunter.
+  // Deux terminaux DIFFÉRENTS : réenclencher le même ne prouve rien, puisqu'un
+  // état qui s'écrase donnerait exactement le même résultat.
+  const apresUn = enclencher(new Set(), 'boitier');
+  const apresDeux = enclencher(apresUn, 'console');
+  assert.deepEqual([...apresDeux].sort(), ['boitier', 'console']);
+  // L'état précédent n'est pas modifié : une fonction pure permet d'annuler et
+  // de restituer une sauvegarde sans surprise.
+  assert.deepEqual([...apresUn], ['boitier']);
+  assert.deepEqual([...enclencher(apresDeux, 'boitier')].sort(), ['boitier', 'console']);
 });
 
 test('un objet léger ne suffit pas à maintenir une plaque de pression', () => {

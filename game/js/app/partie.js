@@ -8,13 +8,20 @@ import * as THREE from 'three';
 import { RoomEnvironment } from '../../lib/RoomEnvironment.js';
 
 import { CHAMBRES } from '../gameplay/chambres.js';
-import { receptaclesActifs, circuitOuvert } from '../gameplay/mecanismes.js';
+import {
+  receptaclesActifs, circuitOuvert, enclencher, faitsDeChambre,
+} from '../gameplay/mecanismes.js';
+import {
+  creerInventaire, memoriser, materialiser, dematerialiser, contenu, placesRestantes,
+} from '../gameplay/inventaire.js';
+import { chercher } from '../perception/base/index.js';
 import { batir, departDe } from '../rendering/batisseur.js';
 import { soleil, ambiance } from '../rendering/kit.js';
 import {
   creerJoueur, regarder, avancer, basculerPrise, majObjets, occupations,
-  objetVise, HAUTEUR_YEUX,
+  objetVise, terminalAPortee, HAUTEUR_YEUX,
 } from './joueur.js';
+import { GABARIT_OBJET } from '../rendering/batisseur.js';
 import { PORTEE_SAISIE } from '../physics/portage.js';
 
 /** Vitesse d'ouverture de la porte, en fraction par seconde. */
@@ -68,10 +75,26 @@ export function demarrer(canvas, indexChambre = 0) {
   const etat = {
     chambre, joueur, objets, bati, scene, camera, renderer,
     ouverture: 0, ouverte: false, actifs: new Set(),
+    enclenches: new Set(),
+    inventaire: creerInventaire(),
     dernierMessage: '',
   };
 
+  /**
+   * Une seule touche pour agir, et l'ordre des priorités compte.
+   *
+   * Déclencher un terminal passe AVANT prendre ou poser : le joueur qui approche
+   * son téléphone d'une console veut la pirater, pas lâcher son téléphone
+   * dessus. L'ordre inverse rendrait le piratage presque impossible à déclencher.
+   */
   function agir() {
+    const cible = terminalAPortee(joueur, bati.terminaux);
+    if (cible && !etat.enclenches.has(cible.instance)) {
+      etat.enclenches = enclencher(etat.enclenches, cible.instance);
+      etat.dernierMessage = `${cible.instance} enclenché.`;
+      return { action: 'enclenche', terminal: cible.instance };
+    }
+
     const resultat = basculerPrise(joueur, objets, bati.receptacles, PORTEE_SAISIE);
     etat.dernierMessage = {
       pris: () => `Vous prenez ${resultat.objet}.`,
@@ -82,6 +105,69 @@ export function demarrer(canvas, indexChambre = 0) {
     return resultat;
   }
   etat.agir = agir;
+
+  /**
+   * Enregistre un objet reconnu par la caméra.
+   *
+   * Le scan ne fait qu'ajouter à la mémoire : rien n'apparaît dans la salle
+   * tant que le joueur ne le décide pas. Matérialiser d'office encombrerait la
+   * pièce et retirerait au joueur le choix du moment.
+   */
+  etat.memoriser = (nom) => {
+    const resultat = memoriser(etat.inventaire, chercher(nom));
+    etat.dernierMessage = resultat.ajoute
+      ? `${nom} mémorisé — invocable à tout moment.`
+      : `${nom} : ${resultat.raison}.`;
+    return resultat;
+  };
+
+  /**
+   * Fait apparaître un objet mémorisé devant le joueur.
+   *
+   * Devant lui et non dans ses mains : l'objet doit être ramassé comme les
+   * autres, pour que la caméra reste une façon d'obtenir un objet et non une
+   * façon de contourner le jeu.
+   */
+  etat.invoquer = (nom) => {
+    const resultat = materialiser(etat.inventaire, nom);
+    if (!resultat.ok) {
+      etat.dernierMessage = `Impossible : ${resultat.raison}.`;
+      return resultat;
+    }
+    const taille = resultat.objet.proprietes.includes('lourd') ? 0.32 : 0.24;
+    const maillage = new THREE.Mesh(
+      new THREE.BoxGeometry(taille, taille, taille),
+      new THREE.MeshStandardMaterial({ color: 0x6ad4b0, roughness: 0.5 }));
+    maillage.castShadow = true;
+    bati.groupe.add(maillage);
+
+    const corps = {
+      nom, proprietes: resultat.objet.proprietes,
+      x: joueur.x - Math.sin(joueur.yaw) * 1.1, y: 0.6,
+      z: joueur.z - Math.cos(joueur.yaw) * 1.1,
+      vy: 0, auSol: false, maillage, invoque: true,
+      gabarit: { rayon: taille / 2, hauteur: taille },
+    };
+    objets.push(corps);
+    etat.dernierMessage = `${nom} matérialisé.`;
+    return { ok: true, corps };
+  };
+
+  /** Renvoie un objet invoqué à l'inventaire, libérant une place. */
+  etat.renvoyer = (nom) => {
+    const index = objets.findIndex((c) => c.invoque && c.nom === nom);
+    if (index < 0) return false;
+    if (joueur.porte === objets[index]) joueur.porte = null;
+    bati.groupe.remove(objets[index].maillage);
+    objets.splice(index, 1);
+    dematerialiser(etat.inventaire, nom);
+    return true;
+  };
+
+  etat.inventaireVisible = () => ({
+    connus: contenu(etat.inventaire).map((o) => o.nom),
+    places: placesRestantes(etat.inventaire),
+  });
 
   addEventListener('keydown', (e) => {
     if (TOUCHES[e.code]) { intentions[TOUCHES[e.code]] = true; e.preventDefault(); }
@@ -104,15 +190,43 @@ export function demarrer(canvas, indexChambre = 0) {
 
   /** Avance la simulation d'un pas. Séparée de la boucle pour être testable. */
   function pas(dt) {
-    avancer(joueur, intentions, bati.colliders, dt);
-    majObjets(joueur, objets, bati.colliders, dt);
+    // Une passerelle déployée devient un sol ; rentrée, elle n'existe plus.
+    // Recomposer la liste à chaque pas coûte peu et évite qu'un pont rentré
+    // reste marchable — le pire des deux mondes.
+    const obstacles = [...bati.colliders];
+    for (const [id, pont] of bati.passerelles) {
+      if ((pont.progression ?? 0) > 0.98) obstacles.push(pont.collider);
+    }
+
+    avancer(joueur, intentions, obstacles, dt);
+    majObjets(joueur, objets, obstacles, dt);
 
     etat.actifs = receptaclesActifs(occupations(joueur, objets, bati.receptacles));
     for (const [instance, recep] of bati.receptacles) {
       recep.socle.userData.signaler(etat.actifs.has(instance));
     }
 
-    etat.ouverte = circuitOuvert(chambre.sortie, etat.actifs);
+    // Les faits d'une chambre sont de trois natures — réceptacles maintenus,
+    // terminaux enclenchés, passerelles déployées — mais la grammaire n'en voit
+    // qu'un seul ensemble. C'est ce qui permet à une sortie de les mélanger sans
+    // une ligne de code supplémentaire.
+    const faits = faitsDeChambre(etat.actifs, etat.enclenches, bati.passerelles);
+    for (const [instance, terminal] of bati.terminaux) {
+      terminal.borne.userData.signaler(etat.enclenches.has(instance));
+    }
+
+    etat.deployees = new Set();
+    for (const [id, pont] of bati.passerelles) {
+      const sortie = faits.has(id) ? 1 : 0;
+      pont.progression = (pont.progression ?? 0)
+        + Math.sign(sortie - (pont.progression ?? 0))
+          * Math.min(Math.abs(sortie - (pont.progression ?? 0)), dt);
+      pont.deployer(pont.progression);
+      if (pont.progression > 0.98) etat.deployees.add(id);
+    }
+    etat.faits = faits;
+
+    etat.ouverte = circuitOuvert(chambre.sortie, faits);
     const cible = etat.ouverte ? 1 : 0;
     // La porte s'anime au lieu de sauter : un changement instantané se lit comme
     // un défaut d'affichage, pas comme une conséquence de ce qu'on vient de faire.

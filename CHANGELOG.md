@@ -6,6 +6,28 @@ Versionnement [SemVer](https://semver.org/lang/fr/).
 ## [Non publié]
 
 ### Ajouté
+- **Terminaux piratables et passerelles** (T-026) : un terminal se déclenche par
+  une **action** et reste **enclenché**, là où un réceptacle se maintient par une
+  présence. La distinction n'est pas cosmétique : les confondre obligerait le
+  joueur à rester planté devant la console, téléphone en main, pendant que la
+  passerelle est sortie — donc à ne jamais pouvoir l'emprunter.
+  Une passerelle rétractable ne devient un sol qu'une fois déployée ; son
+  collider n'existe pas avant.
+  Deux voies pour un même pont : la console exige un appareil programmable, le
+  boîtier seulement de quoi ponter deux contacts. Un joueur sans téléphone n'est
+  donc jamais bloqué — c'est la règle des solutions multiples appliquée au
+  piratage.
+- **Inventaire des objets scannés** (T-027) : un objet montré à la caméra reste
+  acquis pour toute la partie. Aller chercher un couteau est un geste physique ;
+  l'exiger deux fois est une punition, pas une mécanique.
+  Le nombre d'objets **matérialisés en même temps** est plafonné à deux, la
+  collection ne l'étant pas. Sans ce plafond, une chambre qui force à choisir
+  quelle plaque lester n'exige plus rien : on invoque autant de briques que
+  nécessaire. Un dépassement refuse la nouvelle invocation plutôt que de retirer
+  la plus ancienne — voir un objet disparaître d'une plaque parce qu'on en a
+  invoqué un autre ailleurs serait incompréhensible.
+  La sauvegarde n'écrit que des noms : recopier les propriétés figerait une
+  partie sur une version périmée du vocabulaire.
 - **Le jeu tourne** (T-025) : le joueur est branché sur les chambres. Se
   déplacer, regarder, sauter, prendre et poser. La boucle complète est vérifiée
   dans un vrai navigateur : marcher jusqu'à la brique, la porter sur la plaque,

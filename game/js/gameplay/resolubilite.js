@@ -19,7 +19,7 @@
 
 import { evaluer } from '../utils/conditions.js';
 import { objetsPour } from '../perception/affordances.js';
-import { RECEPTACLES, objetsActivant } from './mecanismes.js';
+import { RECEPTACLES, TERMINAUX, objetsActivant, declenchePar } from './mecanismes.js';
 
 /**
  * Nombre maximal de réceptacles par salle.
@@ -54,7 +54,36 @@ function typeDeReceptacle(declaration) {
 export function objetsCapables(besoin, catalogue) {
   if (besoin.affordance) return objetsPour(besoin.affordance, catalogue).map((c) => c.entree);
   if (besoin.receptacle) return objetsActivant(besoin.receptacle, catalogue);
+  if (besoin.terminal) {
+    return catalogue.filter((entree) => declenchePar(besoin.terminal, entree.proprietes));
+  }
   throw new Error(`Besoin mal formé : ${JSON.stringify(besoin)}`);
+}
+
+/**
+ * Remplace chaque passerelle par la condition qui la sort.
+ *
+ * Une passerelle n'est pas un mécanisme : c'est un EFFET. Écrire « la sortie
+ * exige le pont » revient à écrire « la sortie exige ce qui sort le pont ».
+ * L'aplatir ici évite au reste du vérificateur de connaître un troisième type
+ * de fait, et garantit qu'on ne peut pas déclarer une passerelle que rien ne
+ * déploie.
+ */
+function aplatirPasserelles(condition, passerelles) {
+  if (typeof condition === 'string') {
+    const passerelle = passerelles.find((p) => p.id === condition);
+    return passerelle
+      ? aplatirPasserelles(passerelle.condition, passerelles)
+      : condition;
+  }
+  for (const forme of ['toutes', 'auMoins', 'sans']) {
+    if (condition[forme]) {
+      return {
+        [forme]: condition[forme].map((c) => aplatirPasserelles(c, passerelles)),
+      };
+    }
+  }
+  return condition;
 }
 
 /**
@@ -130,13 +159,21 @@ export function verifierSalle(salle, chercher) {
     return echec(salle, `objets absents de la base : ${introuvables.join(', ')}`);
   }
 
-  const instances = Object.keys(salle.receptacles ?? {});
   for (const [instance, declaration] of Object.entries(salle.receptacles ?? {})) {
     const type = typeDeReceptacle(declaration);
     if (!RECEPTACLES[type]) return echec(salle, `réceptacle inconnu : ${instance} → ${type}`);
   }
+  for (const [instance, declaration] of Object.entries(salle.terminaux ?? {})) {
+    const type = typeDeReceptacle(declaration);
+    if (!TERMINAUX[type]) return echec(salle, `terminal inconnu : ${instance} → ${type}`);
+  }
 
-  const combinaisons = combinaisonsSatisfaisantes(salle.sortie ?? { toutes: [] }, instances);
+  const instances = [
+    ...Object.keys(salle.receptacles ?? {}),
+    ...Object.keys(salle.terminaux ?? {}),
+  ];
+  const sortie = aplatirPasserelles(salle.sortie ?? { toutes: [] }, salle.passerelles ?? []);
+  const combinaisons = combinaisonsSatisfaisantes(sortie, instances);
   if (combinaisons.length === 0) {
     return echec(salle, 'aucune combinaison de mécanismes n\'ouvre la sortie');
   }
@@ -154,12 +191,29 @@ export function verifierSalle(salle, chercher) {
 
 /** Tente de résoudre la salle en activant exactement cette combinaison. */
 function tenter(salle, combinaison, catalogue) {
-  const mobilisees = combinaison.map((instance) => ({
+  // Deux natures dans la même combinaison : un réceptacle IMMOBILISE son objet,
+  // un terminal ne fait que l'emprunter le temps du geste. Les mélanger dans le
+  // couplage exigerait un objet dédié par console, et refuserait des salles
+  // parfaitement jouables.
+  const surReceptacle = combinaison.filter((i) => salle.receptacles?.[i]);
+  const surTerminal = combinaison.filter((i) => salle.terminaux?.[i]);
+
+  const mobilisees = surReceptacle.map((instance) => ({
     id: instance,
     candidats: objetsCapables(
       { receptacle: typeDeReceptacle(salle.receptacles[instance]) }, catalogue)
       .map((entree) => entree.nom),
   }));
+
+  for (const instance of surTerminal) {
+    const type = typeDeReceptacle(salle.terminaux[instance]);
+    if (objetsCapables({ terminal: type }, catalogue).length === 0) {
+      return {
+        resoluble: false, salle: salle.id,
+        raison: `rien dans la salle ne déclenche « ${instance} » (${type})`,
+      };
+    }
+  }
 
   for (const exigence of mobilisees) {
     if (exigence.candidats.length === 0) {
@@ -183,14 +237,24 @@ function tenter(salle, combinaison, catalogue) {
   // Chaque outil est utilisé brièvement, jamais en même temps qu'un autre : on
   // le teste donc seul, ajouté aux mécanismes déjà occupés. Le couplage peut
   // alors relaisser un objet à l'outil en déplaçant un autre sur un mécanisme.
-  for (const epreuve of salle.epreuves ?? []) {
-    const candidats = objetsCapables({ affordance: epreuve.affordance }, catalogue)
+  // Terminaux et épreuves se traitent pareil : un geste bref, jamais simultané
+  // avec un autre, mais qui a besoin d'un objet non immobilisé à cet instant.
+  const gestes = [
+    ...surTerminal.map((instance) => ({
+      id: instance,
+      besoin: { terminal: typeDeReceptacle(salle.terminaux[instance]) },
+    })),
+    ...(salle.epreuves ?? []).map((e) => ({ id: e.id, besoin: { affordance: e.affordance } })),
+  ];
+
+  for (const epreuve of gestes) {
+    const candidats = objetsCapables(epreuve.besoin, catalogue)
       .map((entree) => entree.nom);
     if (candidats.length === 0) {
       return {
         resoluble: false,
         salle: salle.id,
-        raison: `aucun objet ne permet « ${epreuve.affordance} » (épreuve ${epreuve.id})`,
+        raison: `aucun objet ne permet « ${epreuve.id} »`,
       };
     }
     const avecOutil = coupler([...mobilisees, { id: `outil:${epreuve.id}`, candidats }]);

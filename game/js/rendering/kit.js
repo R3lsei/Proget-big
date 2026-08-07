@@ -486,3 +486,66 @@ export function socleReceptacle({ largeur = 1, etat = 'soigne' } = {}) {
   };
   return groupe;
 }
+
+/**
+ * Borne de terminal : une console à hauteur de main.
+ *
+ * Volontairement haute et verticale, là où un réceptacle est plat au sol. La
+ * silhouette dit ce qu'on en fait avant tout texte : on POSE sur l'un, on
+ * MANIPULE l'autre.
+ */
+export function borneTerminal({ etat = 'soigne' } = {}) {
+  const groupe = new THREE.Group();
+  groupe.name = 'terminal';
+  const m = materiaux();
+
+  const fut = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1.1, 0.35), m.structure);
+  fut.position.y = 0.55;
+  fut.castShadow = true;
+  fut.receiveShadow = true;
+  groupe.add(fut);
+
+  const ecran = new THREE.Mesh(
+    new THREE.BoxGeometry(0.42, 0.3, 0.04),
+    new THREE.MeshBasicMaterial({ color: 0xff5533 }));
+  ecran.position.set(0, 1.02, 0.19);
+  ecran.rotation.x = -0.35;
+  groupe.add(ecran);
+
+  groupe.userData.signaler = (actif) => {
+    ecran.material.color.setHex(actif ? 0x44dd88 : 0xff5533);
+  };
+  return groupe;
+}
+
+/**
+ * Passerelle rétractable.
+ *
+ * `deployer` prend une progression de 0 à 1, comme la porte : l'animation reste
+ * à l'appelant, pour que l'état soit restituable exactement tel qu'une sauvegarde
+ * l'a laissé.
+ */
+export function passerelle({ largeur = 2, longueur = 3, etat = 'soigne' } = {}) {
+  const groupe = new THREE.Group();
+  groupe.name = `passerelle_${largeur}x${longueur}`;
+  const m = materiaux();
+
+  const tablier = new THREE.Mesh(
+    new THREE.BoxGeometry(largeur * MODULE, 0.12, longueur * MODULE),
+    etat === 'envahi' ? m.panneau_use : m.structure);
+  tablier.castShadow = true;
+  tablier.receiveShadow = true;
+  groupe.add(tablier);
+
+  const course = longueur * MODULE;
+  groupe.userData.deployer = (progression) => {
+    const p = Math.min(1, Math.max(0, progression));
+    // Rentrée, la passerelle glisse sous le bord : elle disparaît sans laisser
+    // un tablier flottant au milieu du vide.
+    tablier.position.z = -course * (1 - p);
+    tablier.position.y = 0.06 - (1 - p) * 0.4;
+    tablier.visible = p > 0.02;
+  };
+  groupe.userData.deployer(0);
+  return groupe;
+}

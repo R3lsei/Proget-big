@@ -11,6 +11,7 @@
 //   app/partie.js    entrées clavier/souris, boucle de rendu
 
 import { deplacerSurAxe } from '../physics/collision.js';
+import { declenchePar } from '../gameplay/mecanismes.js';
 import {
   suivrePorteur, appliquerGravite, aPortee, facteurVitesse, poserSur, reposeSur,
 } from '../physics/portage.js';
@@ -152,6 +153,29 @@ export function majObjets(joueur, objets, obstacles, dt) {
         corps.x, corps.y + corps.gabarit.hauteur / 2, corps.z);
     }
   }
+}
+
+/**
+ * Terminal à portée que l'objet tenu permet de déclencher, ou `null`.
+ *
+ * Il faut TENIR l'objet, pas seulement le posséder : brandir son téléphone
+ * devant la console est le geste, et c'est lui qu'on récompense. Sans cette
+ * exigence, le piratage se ferait de loin, sans rien décider.
+ */
+export function terminalAPortee(joueur, terminaux, portee = 2.2) {
+  if (!joueur.porte) return null;
+  for (const [instance, terminal] of terminaux) {
+    const centre = {
+      x: (terminal.boite.minX + terminal.boite.maxX) / 2,
+      y: (terminal.boite.minY + terminal.boite.maxY) / 2,
+      z: (terminal.boite.minZ + terminal.boite.maxZ) / 2,
+    };
+    if (!aPortee(joueur, centre, portee)) continue;
+    if (declenchePar(terminal.type, joueur.porte.proprietes)) {
+      return { instance, terminal };
+    }
+  }
+  return null;
 }
 
 /**

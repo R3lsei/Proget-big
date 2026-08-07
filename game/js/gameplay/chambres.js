@@ -17,7 +17,9 @@
 //   taille       { largeur, profondeur } en modules de 1,2 m
 //   objets       objets PRÉSENTS dans la pièce, noms de la base curatée
 //   poses        objet → { x, z } en modules — où il repose au départ
-//   receptacles  instance → { type, x, z } — type dans mecanismes.js, position en modules
+//   receptacles  instance → { type, x, z } — maintenu par une PRÉSENCE
+//   terminaux    instance → { type, x, z } — déclenché par une ACTION, reste acquis
+//   passerelles  [{ id, x, z, largeur, longueur, condition }] — franchissables une fois sorties
 //   sortie       condition sur les instances (grammaire de utils/conditions)
 //   epreuves     [{ id, affordance }] outils nécessaires
 //   porte        { mur, ouverture }
@@ -67,6 +69,9 @@ const SERRE = {
   // détecter, et la raison pour laquelle il ne se contente pas d'une suite de
   // vérifications indépendantes.
   objets: ['brique', 'pot de fleurs', 'tournevis', 'arrosoir'],
+  // `tournevis` est conducteur et allongé : il ponte le boîtier. Aucun objet de
+  // la salle n'est programmable — la console est donc la voie de qui montre un
+  // téléphone à la caméra, le boîtier celle de qui n'en a pas.
   poses: {
     brique: { x: -1.4, z: 2.2 },
     'pot de fleurs': { x: 1.6, z: 2.4 },
@@ -77,7 +82,24 @@ const SERRE = {
     plaque_gauche: { type: 'plaque_pression', x: -3, z: -1 },
     plaque_droite: { type: 'plaque_pression', x: 3, z: -1 },
   },
-  sortie: { toutes: ['plaque_gauche', 'plaque_droite'] },
+  terminaux: {
+    // DEUX voies pour la même passerelle : la console demande de l'informatique,
+    // le boîtier seulement de quoi ponter deux contacts. Un joueur sans appareil
+    // programmable n'est donc jamais bloqué — c'est la règle des solutions
+    // multiples appliquée au piratage.
+    console: { type: 'console_reseau', x: -4, z: -2.6 },
+    boitier: { type: 'boitier_commande', x: 4, z: -2.6 },
+  },
+  passerelles: [
+    {
+      id: 'pont',
+      x: 0, z: -2.4, largeur: 2, longueur: 3,
+      condition: { auMoins: ['console', 'boitier'] },
+    },
+  ],
+  // La sortie exige les deux plaques ET la passerelle : sans elle, les plaques
+  // sont hors d'atteinte de l'autre côté du gouffre.
+  sortie: { toutes: ['plaque_gauche', 'plaque_droite', 'pont'] },
   epreuves: [{ id: 'trappe', affordance: 'faire_levier' }],
   porte: { mur: 'nord', ouverture: 2 },
   decor: [

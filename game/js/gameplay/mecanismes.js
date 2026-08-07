@@ -21,6 +21,7 @@
 // chute des objets appartiennent à `physics/`.
 
 import { evaluer, feuilles, expliquer } from '../utils/conditions.js';
+import { permet } from '../perception/affordances.js';
 
 /**
  * Les réceptacles du complexe.
@@ -203,4 +204,106 @@ export function indiceDe(idReceptacle, libelleDe = (id) => id) {
 export function objetsActivant(idReceptacle, entrees) {
   if (!RECEPTACLES[idReceptacle]) return [];
   return entrees.filter((entree) => activePar(idReceptacle, entree.proprietes));
+}
+
+/**
+ * Terminaux : mécanismes déclenchés par une ACTION, et qui restent enclenchés.
+ *
+ * ─── Pourquoi ce n'est pas un réceptacle ─────────────────────────────────────
+ * Une plaque se maintient par une présence : on retire l'objet, elle retombe.
+ * Un terminal piraté reste piraté. Les confondre obligerait le joueur à rester
+ * planté devant la console, téléphone en main, pendant que la passerelle est
+ * sortie — ce qui n'a aucun sens et l'empêcherait de l'emprunter.
+ *
+ *   requiert   affordance nécessaire (voir perception/affordances.js)
+ *   verrouille l'état reste acquis une fois obtenu
+ */
+export const TERMINAUX = Object.freeze({
+  console_reseau: {
+    libelle: 'Console réseau',
+    requiert: 'pirater',
+    verrouille: true,
+    indice: 'Une console vivante. Elle attend qu\'on lui parle son langage.',
+  },
+  boitier_commande: {
+    libelle: 'Boîtier de commande',
+    // Le boîtier est ouvert : le forcer ne demande pas d'informatique, seulement
+    // de quoi ponter deux contacts. Deux voies pour une même porte.
+    requiert: 'conduire',
+    verrouille: true,
+    indice: 'Le capot pend. Deux contacts nus, à réunir.',
+  },
+  lecteur_optique: {
+    libelle: 'Lecteur optique',
+    requiert: 'eclairer',
+    verrouille: true,
+    indice: 'La cellule est morte. Il lui faudrait de la lumière.',
+  },
+  serrure_mecanique: {
+    libelle: 'Serrure mécanique',
+    requiert: 'crocheter',
+    verrouille: true,
+    indice: 'Une serrure d\'un autre âge — donc sans électronique à pirater.',
+  },
+});
+
+/** Identifiants des terminaux, dans l'ordre de déclaration. */
+export const IDS_TERMINAUX = Object.freeze(Object.keys(TERMINAUX));
+
+/**
+ * Un objet permet-il de déclencher ce terminal ?
+ *
+ * Le terminal ne demande pas un objet précis mais une CAPACITÉ : pirater, ponter,
+ * éclairer. Un téléphone, un ordinateur ou n'importe quoi de programmable et
+ * communicant ouvre la même console — y compris un objet montré à la caméra.
+ */
+export function declenchePar(idTerminal, proprietes) {
+  const terminal = TERMINAUX[idTerminal];
+  if (!terminal) return false;
+  return permet(terminal.requiert, proprietes);
+}
+
+/**
+ * Terminaux enclenchés, à partir de ceux déjà acquis et d'une nouvelle action.
+ *
+ * Fonction pure : on lui passe l'état, elle renvoie le suivant. L'état verrouillé
+ * doit survivre à une sauvegarde et à un rechargement — le garder dans une
+ * variable de module le perdrait au premier retour au menu.
+ */
+export function enclencher(acquis, instance) {
+  const suivant = new Set(acquis);
+  suivant.add(instance);
+  return suivant;
+}
+
+/** Indice d'un terminal, formulé en capacité et jamais en objet. */
+export function indiceTerminal(idTerminal) {
+  return TERMINAUX[idTerminal]?.indice ?? '';
+}
+
+/**
+ * Assemble tous les faits vrais d'une chambre, en un seul ensemble.
+ *
+ * Trois natures s'y mêlent — réceptacles maintenus, terminaux enclenchés,
+ * passerelles déployées — mais la grammaire de conditions n'en voit qu'un
+ * ensemble de noms. C'est ce qui permet à une sortie d'exiger
+ * `{ toutes: ['plaque_gauche', 'plaque_droite', 'pont'] }` sans que rien ne sache
+ * que ces trois-là ne sont pas de même espèce.
+ *
+ * Fonction unique et partagée : le jeu et les tests doivent calculer les faits
+ * de la même façon, sinon on vérifie un état que le joueur ne connaîtra jamais.
+ *
+ * @param {Set<string>} actifs       réceptacles occupés
+ * @param {Set<string>} enclenches   terminaux déjà déclenchés
+ * @param {Iterable<[string, {condition: object}]>} passerelles
+ */
+export function faitsDeChambre(actifs, enclenches, passerelles = []) {
+  const faits = new Set([...(actifs ?? []), ...(enclenches ?? [])]);
+  // Une passerelle dépend de terminaux, jamais d'une autre passerelle : un seul
+  // passage suffit. Autoriser l'enchaînement demanderait un point fixe, et
+  // surtout ouvrirait la porte aux dépendances circulaires.
+  for (const [id, pont] of passerelles) {
+    if (evaluer(pont.condition, faits)) faits.add(id);
+  }
+  return faits;
 }
