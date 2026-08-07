@@ -50,13 +50,32 @@ def main() -> None:
         print("  Lancez ce script depuis la racine du projet.")
         sys.exit(1)
 
-    port = int(sys.argv[1]) if len(sys.argv) > 1 else 8000
+    # Le fichier doit exister AVANT de lancer quoi que ce soit : un serveur qui
+    # démarre puis renvoie 404 laisse croire à une panne du jeu, alors que c'est
+    # l'extraction qui est incomplète.
+    if not (RACINE / PAGE).is_file():
+        print(f"  ERREUR : {PAGE} est introuvable dans {RACINE}")
+        print("  L'archive a-t-elle bien été EXTRAITE en entier ?")
+        print("  (Windows : clic droit sur le ZIP, « Extraire tout »)")
+        sys.exit(1)
+
+    demande = int(sys.argv[1]) if len(sys.argv) > 1 else 8000
     handler = partial(HandlerSansCache, directory=str(RACINE))
-    try:
-        serveur = ThreadingHTTPServer(("127.0.0.1", port), handler)
-    except OSError as exc:
-        print(f"  ERREUR : impossible d'ouvrir le port {port} ({exc}).")
-        print(f"  Essayez un autre port :  python jouer.py {port + 1}")
+
+    # Un ancien serveur d'une extraction précédente peut occuper le port et
+    # servir un dossier qui ne contient pas ces chambres — le navigateur affiche
+    # alors un 404 venu de NULLE PART, et rien n'indique que la page ouverte
+    # n'est pas la nôtre. On prend donc le premier port réellement libre.
+    serveur = None
+    for port in range(demande, demande + 12):
+        try:
+            serveur = ThreadingHTTPServer(("127.0.0.1", port), handler)
+            break
+        except OSError:
+            print(f"  Port {port} déjà utilisé — j'essaie le suivant.")
+    if serveur is None:
+        print(f"  ERREUR : aucun port libre entre {demande} et {demande + 11}.")
+        print("  Fermez les autres fenêtres NOVA-7 encore ouvertes, puis réessayez.")
         sys.exit(1)
 
     # Paramètre unique à chaque lancement : `no-store` ne gouverne que les
@@ -67,6 +86,7 @@ def main() -> None:
   NOVA-7 — chambres
 
   Ouvert sur : {url}
+  Dossier servi : {RACINE}
 
   ZQSD    se déplacer          E    prendre / poser
   souris  regarder             C    caméra
