@@ -19,6 +19,20 @@
   #etat { position: fixed; top: 1.2rem; right: 1.2rem; background: rgba(12,16,18,.78);
           padding: .7rem 1rem; border-radius: .4rem; font-variant-numeric: tabular-nums; }
   .ouverte { color: #45d19a; } .fermee { color: #ff7a5c; }
+  #scanner { position: fixed; right: 1.2rem; bottom: 1.2rem; width: 320px;
+             background: rgba(12,16,18,.9); border-radius: .5rem; padding: .8rem;
+             border-left: 3px solid #45d19a; display: none; }
+  #scanner.ouvert { display: block; }
+  #scan-video { width: 100%; border-radius: .3rem; background: #000; display: block; }
+  #scan-etat { margin-top: .5rem; min-height: 2.4em; }
+  #sacoche { position: fixed; left: 1.2rem; bottom: 1.2rem;
+             background: rgba(12,16,18,.85); border-radius: .5rem; padding: .7rem 1rem;
+             max-width: 300px; }
+  #sacoche ol { margin: .4rem 0 0; padding-left: 1.4rem; }
+  #sacoche li { cursor: default; }
+  #sacoche .vide { opacity: .6; font-style: italic; }
+  kbd { background: #263034; border-radius: .2rem; padding: 0 .35rem;
+        font: inherit; font-size: .9em; color: #9fe8cd; }
 </style>
 </head>
 <body>
@@ -26,10 +40,20 @@
 <div id="mire"></div>
 <div id="aide">
   <b>ZQSD</b> se déplacer · <b>souris</b> regarder · <b>espace</b> sauter<br>
-  <b>E</b> prendre / poser · <b>clic</b> capturer la souris
+  <b>E</b> prendre / poser · <b>C</b> caméra · <b>clic</b> capturer la souris
 </div>
 <div id="etat"></div>
 <div id="hud">Cliquez pour commencer.</div>
+
+<div id="scanner">
+  <video id="scan-video" autoplay playsinline muted></video>
+  <div id="scan-etat">Caméra éteinte.</div>
+</div>
+
+<div id="sacoche">
+  <b>Sacoche</b> — <kbd>C</kbd> scanner · <kbd>1</kbd>…<kbd>9</kbd> invoquer
+  <div id="sacoche-liste" class="vide">Rien de mémorisé.</div>
+</div>
 
 <script type="importmap">
 { "imports": { "three": "./lib/three.module.js" } }
@@ -45,6 +69,63 @@ window.NOVA = partie;
 
 const hud = document.getElementById('hud');
 const etat = document.getElementById('etat');
+
+// ─── Caméra ─────────────────────────────────────────────────────────────────
+const panneau = document.getElementById('scanner');
+const video = document.getElementById('scan-video');
+const scanEtat = document.getElementById('scan-etat');
+const liste = document.getElementById('sacoche-liste');
+let analyse = 0;
+
+async function basculerScanner() {
+  if (panneau.classList.contains('ouvert')) {
+    partie.fermerScanner(video);
+    panneau.classList.remove('ouvert');
+    clearInterval(analyse);
+    scanEtat.textContent = 'Caméra éteinte.';
+    return;
+  }
+  panneau.classList.add('ouvert');
+  scanEtat.textContent = 'Ouverture…';
+  const resultat = await partie.ouvrirScanner(video);
+  if (!resultat.ok) { scanEtat.textContent = partie.dernierMessage; return; }
+  // Une analyse toutes les 350 ms : assez pour paraître vivant, assez espacé
+  // pour que le détecteur ne mange pas le temps du rendu.
+  analyse = setInterval(async () => {
+    const vu = await partie.analyser(video);
+    scanEtat.textContent = {
+      rien: 'Rien de reconnu. Approchez l\'objet.',
+      hesite: `${vu.nom} ? Maintenez-le en place…`,
+      memorise: `${vu.nom} mémorisé.`,
+      connu: `${vu.nom} — déjà dans la sacoche.`,
+      inactif: 'Caméra éteinte.',
+    }[vu.etat];
+    majSacoche();
+  }, 350);
+}
+
+function majSacoche() {
+  const { connus, places } = partie.inventaireVisible();
+  if (!connus.length) {
+    liste.className = 'vide';
+    liste.textContent = 'Rien de mémorisé.';
+    return;
+  }
+  liste.className = '';
+  liste.innerHTML = '<ol>' + connus.map((nom, i) =>
+    `<li><kbd>${i + 1}</kbd> ${nom}</li>`).join('') + '</ol>'
+    + `<div style="opacity:.7;margin-top:.3rem">${places} place(s) disponible(s)</div>`;
+}
+
+addEventListener('keydown', (e) => {
+  if (e.code === 'KeyC') { basculerScanner(); return; }
+  const chiffre = Number(e.key);
+  if (chiffre >= 1 && chiffre <= 9) {
+    const { connus } = partie.inventaireVisible();
+    const nom = connus[chiffre - 1];
+    if (nom) { partie.invoquer(nom); majSacoche(); }
+  }
+});
 
 setInterval(() => {
   hud.textContent = partie.dernierMessage

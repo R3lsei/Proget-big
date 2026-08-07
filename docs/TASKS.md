@@ -19,7 +19,6 @@
 
 | ID | Tâche | Dépend de |
 |---|---|---|
-| T-026 | **Caméra dans les chambres** : l'objet scanné se matérialise et sert de solution | T-025 ✅ |
 | T-013 | Repli sémantique hors base | T-011 ✅ |
 | T-016 | Mesure embarquée de la latence de scan | T-012 ✅ |
 | T-015 | Grammaire d'énigmes et chargeur de salles | T-012 ✅ |
@@ -37,6 +36,7 @@
 | T-000 | Conception validée (7 axes) | SPEC, GAMEPLAY, ARCHITECTURE écrits |
 | T-000b | Faisabilité open-vocabulary | transformers.js v4.2.0 disponible, bundle autonome 510 Ko, WebGPU détecté |
 | T-000c | Banc de mesure livré | `tools/spike-detection/`, zéro erreur JS |
+| T-030 | **La caméra est branchée** | Chaîne complète : webcam → détection → base curatée → sacoche → matérialisation. Vérifiée en navigateur avec une webcam simulée : montrer un téléphone, l'invoquer, le prendre, pirater la console, voir le pont sortir. **Aucun objet de la serre n'est programmable** — cette console ne s'ouvre qu'à la caméra, et pourtant la salle reste franchissable sans elle par le boîtier. 18 tests, dont celui qui interdit qu'une chambre exige la caméra |
 | T-029 | Gouffre réel et restauration | Les zones étaient purement logiques : le vérificateur jurait que la plate-forme exigeait le pont, et le joueur y marchait sur un sol plein. Le gouffre est désormais creusé, donc la séparation est physique. Tout ce qui y tombe remonte — objet à sa place, joueur au départ, objet invoqué rendu à l'inventaire. Supprimer la classe de problème plutôt que prouver qu'elle n'arrive jamais. 11 tests ; mutation, 7 sur 7 |
 | T-028 | **Le vérificateur comprend l'espace** | Point fixe de progression : avec ce qu'on atteint, qu'active-t-on ; avec ce qu'on active, qu'atteint-on de plus. Attrape le piège des chaînes de mini-épreuves — l'outil qui sort la passerelle placé de l'autre côté de la passerelle. Sans lui, la salle était annoncée franchissable et ne l'était pas. 8 tests ; mutation, 5 sur 5 après correction d'un test non discriminant |
 | T-027 | Inventaire des objets scannés | Un objet montré reste acquis pour toute la partie — le remontrer serait une punition, pas une mécanique. Plafond de 2 matérialisations simultanées : sans lui, une énigme d'arbitrage n'exige plus rien. La sauvegarde n'écrit que des noms, jamais les propriétés. 17 tests |

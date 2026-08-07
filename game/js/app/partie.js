@@ -15,6 +15,11 @@ import {
   creerInventaire, memoriser, materialiser, dematerialiser, contenu, placesRestantes,
 } from '../gameplay/inventaire.js';
 import { chercher } from '../perception/base/index.js';
+import { ouvrir as ouvrirCamera, fermer as fermerCamera, estActive } from '../perception/camera.js';
+import {
+  creerStabilisateur, stabiliser, versEntree, meilleure,
+} from '../perception/detecteur.js';
+import * as cocossd from '../perception/detecteurs/cocossd.js';
 import { batir, departDe } from '../rendering/batisseur.js';
 import { soleil, ambiance } from '../rendering/kit.js';
 import {
@@ -163,6 +168,71 @@ export function demarrer(canvas, indexChambre = 0) {
     objets.splice(index, 1);
     dematerialiser(etat.inventaire, nom);
     return true;
+  };
+
+  // ─── Caméra ───────────────────────────────────────────────────────────────
+  //
+  // Le scan MÉMORISE, il ne matérialise pas. Faire apparaître l'objet d'office
+  // encombrerait la salle et retirerait au joueur le choix du moment — or c'est
+  // ce choix qui fait de la caméra une mécanique et non un distributeur.
+
+  const vision = { flux: null, modele: null, stabilisateur: creerStabilisateur(), actif: false };
+  etat.vision = vision;
+
+  /** Allume la caméra et charge le détecteur. Idempotent. */
+  etat.ouvrirScanner = async (video) => {
+    if (!vision.modele) {
+      etat.dernierMessage = 'Chargement du module de reconnaissance…';
+      try {
+        vision.modele = await cocossd.charger({});
+      } catch (erreur) {
+        etat.dernierMessage = `Reconnaissance indisponible : ${erreur.message}`;
+        return { ok: false };
+      }
+    }
+    if (!estActive(vision.flux)) {
+      const resultat = await ouvrirCamera({});
+      if (!resultat.ok) {
+        etat.dernierMessage = resultat.raison;
+        return resultat;
+      }
+      vision.flux = resultat.flux;
+      if (video) { video.srcObject = vision.flux; await video.play().catch(() => {}); }
+    }
+    vision.actif = true;
+    vision.stabilisateur = creerStabilisateur();
+    etat.dernierMessage = 'Montrez un objet à la caméra.';
+    return { ok: true };
+  };
+
+  /** Éteint réellement la caméra : pistes arrêtées, pas seulement détachées. */
+  etat.fermerScanner = (video) => {
+    fermerCamera(vision.flux);
+    vision.flux = null;
+    vision.actif = false;
+    if (video) video.srcObject = null;
+    return true;
+  };
+
+  /**
+   * Analyse une image et mémorise ce qui se confirme.
+   *
+   * La stabilisation est ici et non dans le détecteur : c'est une règle de jeu
+   * — « il faut montrer l'objet un instant » — pas une propriété du modèle.
+   */
+  etat.analyser = async (source) => {
+    if (!vision.modele || !source) return { etat: 'inactif' };
+    const detections = await cocossd.detecter(vision.modele, source);
+    const entree = versEntree(meilleure(detections), cocossd.traduire);
+    vision.stabilisateur = stabiliser(vision.stabilisateur, entree?.nom ?? null);
+
+    if (!entree) return { etat: 'rien' };
+    if (!vision.stabilisateur.confirme) {
+      return { etat: 'hesite', nom: entree.nom, serie: vision.stabilisateur.serie };
+    }
+    const memorise = etat.memoriser(entree.nom);
+    vision.stabilisateur = creerStabilisateur();
+    return { etat: memorise.ajoute ? 'memorise' : 'connu', nom: entree.nom };
   };
 
   etat.inventaireVisible = () => ({

@@ -6,6 +6,24 @@ Versionnement [SemVer](https://semver.org/lang/fr/).
 ## [Non publié]
 
 ### Ajouté
+- **La caméra est branchée** (T-030) : la chaîne complète fonctionne — webcam,
+  détection, traduction vers la base curatée, sacoche, matérialisation dans la
+  salle. Vérifiée dans un vrai navigateur avec une webcam simulée : montrer un
+  téléphone, l'invoquer, le prendre, pirater la console, voir la passerelle
+  sortir.
+  La démonstration qui compte : **aucun objet de la serre n'est programmable**.
+  Cette console ne s'ouvre qu'avec un appareil montré à la caméra — et la salle
+  reste pourtant franchissable sans elle, par le boîtier que ponte un tournevis.
+  La caméra ajoute une solution, elle n'en remplace aucune, et un test l'exige
+  de chaque chambre.
+  Le vocabulaire du modèle ne franchit jamais la frontière : « cell phone »
+  devient « téléphone » dans le détecteur, et le gameplay ne voit que des noms
+  de la base. Changer de modèle ne touchera pas une ligne de règles.
+  Une détection doit tenir trois images avant d'être retenue, sinon une
+  reconnaissance hésitante remplirait la sacoche de choses jamais montrées. Et
+  fermer le scanner arrête réellement les pistes vidéo : une webcam dont le
+  voyant reste allumé détruit une confiance qu'aucune promesse écrite ailleurs
+  ne rétablit.
 - **Gouffre réel et restauration de ce qui tombe** (T-029) : les zones d'une
   chambre n'étaient que des mots. Le vérificateur jurait que la plate-forme
   n'était atteignable qu'une fois le pont sorti, et le joueur y marchait
