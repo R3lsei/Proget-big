@@ -22,6 +22,7 @@ import {
 import * as cocossd from '../perception/detecteurs/cocossd.js';
 import { batir, departDe, aFranchi } from '../rendering/batisseur.js';
 import { soleil, ambiance } from '../rendering/kit.js';
+import { creerComposeur, redimensionner } from '../rendering/posttraitement.js';
 import {
   creerJoueur, regarder, avancer, basculerPrise, majObjets, occupations,
   objetVise, terminalAPortee, restaurerEgares, HAUTEUR_YEUX,
@@ -131,6 +132,19 @@ export function demarrer(canvas, indexChambre = 0) {
   etat.chargerChambre = chargerChambre;
 
   chargerChambre(indexChambre);
+
+  // La chaîne d'image est construite APRÈS la première chambre : sa passe de
+  // rendu capture la scène et la caméra, qui doivent exister.
+  const image = creerComposeur(renderer, scene, camera, {
+    largeur: canvas.clientWidth || 1280, hauteur: canvas.clientHeight || 720,
+  });
+  etat.image = image;
+  etat.redimensionner = (largeur, hauteur) => {
+    renderer.setSize(largeur, hauteur);
+    camera.aspect = largeur / hauteur;
+    camera.updateProjectionMatrix();
+    redimensionner(image, largeur, hauteur);
+  };
 
   /**
    * Une seule touche pour agir, et l'ordre des priorités compte.
@@ -419,7 +433,10 @@ export function demarrer(canvas, indexChambre = 0) {
       pas(PAS_FIXE);
       accumulateur -= PAS_FIXE;
     }
-    renderer.render(scene, camera);
+    // On rend par le composeur, jamais par le renderer : `renderer.render`
+    // afficherait la scène brute et court-circuiterait toute la chaîne, sans
+    // erreur ni avertissement. L'image serait simplement fade.
+    image.composeur.render();
     requestAnimationFrame(boucle);
   }
   requestAnimationFrame(boucle);

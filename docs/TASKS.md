@@ -24,7 +24,10 @@
 | T-015 | Grammaire d'énigmes et chargeur de salles | T-012 ✅ |
 | T-017 | Transformation d'objets (briser un objet cassant → tesson tranchant) | T-012 ✅ |
 | T-023 | Espèces manquantes : lianes et mousses pour les zones envahies | T-021 ✅ |
-| T-024 | Textures de matières et occlusion ambiante | T-020 ✅ |
+| T-024 | **Étape 2** : textures de matières et occlusion ambiante | T-032 ✅ |
+| T-033 | **Étape 3** : chanfreins sur toute la géométrie | T-024 |
+| T-034 | **Étape 4** : modèles 3D libres accordés au style établi | T-033 |
+| T-035 | Chambres 2 à 9 : trois actes, une mécanique nouvelle par salle | T-032 ✅ |
 
 ---
 
@@ -32,6 +35,7 @@
 
 | ID | Tâche | Résultat |
 |---|---|---|
+| T-032 | **Étape 1 de la refonte graphique : la chaîne d'image** | Floraison, étalonnage, virage partiel, vignettage. Le joueur demandait des modèles 3D ; le diagnostic était ailleurs. Rien n'avait de matière, et poser un modèle fin contre un mur en aplat n'aurait pas relevé le mur — cela aurait souligné qu'il est plat. Le mélange de styles est la façon la plus sûre de faire amateur. Fortnite tient sur des formes simples : c'est le traitement qui fait tout. L'ordre des passes est le cœur — floraison AVANT la sortie (valeurs non bornées, sinon une lampe ne se distingue plus d'un mur blanc), étalonnage APRÈS (valeurs d'écran, seul endroit où le contraste a un sens). Une inversion ne plante pas, elle rend l'image fausse en silence. 13 tests ; mutation, 7 sur 7. A révélé B-030 : un témoin d'un mètre de côté qui faisait rougir les bornes voisines |
 | T-031 | **Le jeu se lance sans rien installer** | Trois livraisons de suite ont échoué au LANCEMENT — écran gris, page 404, Python absent — pendant que 296 tests passaient au vert. Le jeu était juste et injouable, et c'est le joueur qui a fait la QA, capture par capture. Serveur de secours en PowerShell pur (`TcpListener`, donc aucun droit administrateur requis) : plus aucune installation exigée sur Windows. Et surtout `npm run lancement`, qui démarre les deux serveurs pour de vrai et réclame la page **plus les 28 modules qu'elle charge** — un import cassé donnait un écran gris muet, il donne une ligne rouge. Bloquant en CI. 5 mutations sur 5 détectées, après réécriture d'un test non discriminant : `fetch` normalise `/../` avant l'envoi, si bien que la vérification anti-remontée passait quoi qu'il arrive |
 | T-001 | Banc de mesure hors-ligne | **Abandonné.** Trois tentatives, aucune mesure obtenue : session ONNX refusée, puis page servie depuis le cache. Le coût a dépassé le bénéfice. Remplacé par T-016, qui mesure la même chose sans rien demander au joueur. Le banc reste dans `tools/` pour qui veut. Décision assumée : on conçoit pour le pire cas (scan lent), l'ergonomie s'adapte à la mesure réelle |
 | T-000 | Conception validée (7 axes) | SPEC, GAMEPLAY, ARCHITECTURE écrits |

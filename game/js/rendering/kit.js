@@ -69,6 +69,27 @@ function creerMateriaux() {
   });
 }
 
+/**
+ * Intensité des voyants. Au-delà de 1 volontairement.
+ *
+ * Une couleur d'écran plafonne à 1, et la floraison ne saisit que ce qui
+ * dépasse son seuil : un voyant à 1,0 ne rayonnerait donc pas plus qu'un mur
+ * blanc, qui est la plus grande surface de la scène. C'est en sortant de
+ * l'intervalle affichable qu'une source devient une SOURCE — le rendu à plage
+ * dynamique étendue n'est pas un effet, c'est ce qui distingue une lampe d'un
+ * carré peint en jaune.
+ */
+export const INTENSITE_SIGNAL = 2.2;
+
+const SIGNAL_ACTIF = 0x44dd88;
+const SIGNAL_INACTIF = 0xff5533;
+
+/** Couleur d'un voyant selon son état, en valeurs non bornées. */
+export function couleurSignal(actif) {
+  return new THREE.Color(actif ? SIGNAL_ACTIF : SIGNAL_INACTIF)
+    .multiplyScalar(INTENSITE_SIGNAL);
+}
+
 let materiauxPartages = null;
 
 /** Palette partagée. Une seule instance par exécution, volontairement. */
@@ -475,14 +496,30 @@ export function socleReceptacle({ largeur = 1, etat = 'soigne' } = {}) {
   plaque.receiveShadow = true;
   groupe.add(plaque);
 
+  // Un LISERÉ, pas une dalle lumineuse.
+  //
+  // Le témoin couvrait auparavant presque tout le socle — un mètre de côté de
+  // pure émission. Sous la floraison, cette surface débordait sur tout ce qui
+  // l'entourait : les bornes en métal sombre paraissaient rouges, à un mètre de
+  // là. Ce n'était pas un réglage trop fort, c'était une source trop GRANDE.
+  // Une machine se signale par un liseré ; une boîte lumineuse ne signale rien.
   const temoin = new THREE.Mesh(
-    new THREE.BoxGeometry(largeur * MODULE * 0.8, 0.02, largeur * MODULE * 0.8),
-    new THREE.MeshBasicMaterial({ color: 0xff5533 }));
+    new THREE.BoxGeometry(largeur * MODULE * 0.86, 0.02, largeur * MODULE * 0.86),
+    new THREE.MeshBasicMaterial({ color: couleurSignal(false) }));
   temoin.position.y = 0.07;
   groupe.add(temoin);
 
+  // Plateau posé par-dessus : il masque le centre et ne laisse voir du témoin
+  // qu'une bordure de quelques centimètres.
+  const plateau = new THREE.Mesh(
+    new THREE.BoxGeometry(largeur * MODULE * 0.72, 0.03, largeur * MODULE * 0.72),
+    m.structure);
+  plateau.position.y = 0.075;
+  plateau.receiveShadow = true;
+  groupe.add(plateau);
+
   groupe.userData.signaler = (actif) => {
-    temoin.material.color.setHex(actif ? 0x44dd88 : 0xff5533);
+    temoin.material.color.copy(couleurSignal(actif));
   };
   return groupe;
 }
@@ -507,13 +544,13 @@ export function borneTerminal({ etat = 'soigne' } = {}) {
 
   const ecran = new THREE.Mesh(
     new THREE.BoxGeometry(0.42, 0.3, 0.04),
-    new THREE.MeshBasicMaterial({ color: 0xff5533 }));
+    new THREE.MeshBasicMaterial({ color: couleurSignal(false) }));
   ecran.position.set(0, 1.02, 0.19);
   ecran.rotation.x = -0.35;
   groupe.add(ecran);
 
   groupe.userData.signaler = (actif) => {
-    ecran.material.color.setHex(actif ? 0x44dd88 : 0xff5533);
+    ecran.material.color.copy(couleurSignal(actif));
   };
   return groupe;
 }

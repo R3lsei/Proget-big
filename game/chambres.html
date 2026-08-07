@@ -175,9 +175,10 @@ setInterval(() => {
 
 addEventListener('resize', () => {
   canvas.width = innerWidth; canvas.height = innerHeight;
-  partie.renderer.setSize(innerWidth, innerHeight);
-  partie.camera.aspect = innerWidth / innerHeight;
-  partie.camera.updateProjectionMatrix();
+  // Une seule fonction : le renderer, la caméra ET la chaîne de post-traitement
+  // doivent changer de taille ensemble. En oublier une décale le halo du reste
+  // de l'image, et l'oubli ne se voit qu'après un redimensionnement.
+  partie.redimensionner(innerWidth, innerHeight);
 });
 </script>
 </body>

@@ -6,6 +6,28 @@ Versionnement [SemVer](https://semver.org/lang/fr/).
 ## [Non publié]
 
 ### Ajouté
+- **Chaîne d'image : floraison, étalonnage, vignettage** (T-032) : le décor était
+  géométriquement juste et visuellement mort — des aplats de couleur, aucune
+  profondeur. Le réflexe est d'aller chercher des modèles 3D plus détaillés ;
+  c'est le mauvais réflexe, et il aggrave le problème. Un modèle fin posé contre
+  un mur en aplat ne relève pas le mur, il souligne qu'il est plat.
+  Ce qui produit le regard « Portal » n'est pas la densité des modèles mais le
+  traitement de l'image : ombres froides, lumières neutres, bords assombris,
+  sources vives qui débordent. La même géométrie change de nature.
+  L'ordre des passes est l'essentiel : la floraison travaille **avant** la
+  conversion de sortie, sur des valeurs non bornées — c'est la seule façon
+  qu'une lampe déborde plus qu'un mur blanc. L'étalonnage travaille **après**,
+  en valeurs d'écran, seul endroit où « contraste autour de 0,5 » a un sens.
+  Une inversion ne planterait pas : elle rendrait l'image fausse en silence.
+  13 tests ; mutation, 7 sur 7.
+- **Les voyants sont devenus des sources** (T-032) : leur couleur sort
+  volontairement de l'intervalle affichable. Un voyant à 1,0 ne rayonne pas plus
+  qu'un mur blanc — c'est en dépassant 1 qu'une surface devient une source.
+- **Licences des bibliothèques embarquées** : `game/lib/CREDITS.md`. three.js
+  est sous MIT et sa notice doit accompagner toute redistribution ; elle
+  manquait depuis le début, et l'ajout de dix fichiers de post-traitement
+  rendait l'omission plus lourde. Reste dû avant publication : l'écran de
+  crédits **dans le jeu**, qu'exige la licence CC-BY du modèle de plante.
 - **Le jeu ne dépend plus de Python** (T-031) : un serveur local en PowerShell
   pur, présent sur tout Windows depuis la version 7, sert désormais le jeu quand
   Python est absent. Exiger l'installation d'un langage pour ouvrir une page web
@@ -232,6 +254,13 @@ Versionnement [SemVer](https://semver.org/lang/fr/).
 - Lumières : 25 sources → pool de 6 suivant le joueur, coût de shader constant.
 
 ### Corrigé
+- **Les bornes paraissaient rouges sous la floraison** (B-030) : le témoin d'un
+  socle couvrait presque tout le socle — un mètre de côté de pure émission. Le
+  halo débordait sur les bornes en métal sombre situées à un mètre de là. Ce
+  n'était pas un réglage trop fort mais une source trop **grande**, et aucun
+  réglage de floraison ne rattrape une surface émissive démesurée. Le témoin est
+  devenu un liseré : plateau sombre par-dessus, bordure de quelques centimètres.
+  Une machine se signale par un liseré ; une boîte lumineuse ne signale rien.
 - **« Python est introuvable » sur un ordinateur sans Python** (B-027) : le
   lanceur Windows se contentait de `where python`. Or Windows installe un faux
   `python.exe` qui n'ouvre que le Microsoft Store : `where` le trouve, on croit
