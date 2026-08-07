@@ -137,6 +137,67 @@ function combinaisonsSatisfaisantes(condition, instances) {
   return trouvees.sort((a, b) => a.length - b.length);
 }
 
+/** Zone toujours atteignable : celle où le joueur commence. */
+export const ZONE_DEPART = 'depart';
+
+/** Zone d'un élément déclaré. Tout ce qui n'est pas situé est au départ. */
+const zoneDe = (salle, nom) => salle.dans?.[nom] ?? ZONE_DEPART;
+
+/**
+ * Progression : quelles zones le joueur finit-il par atteindre ?
+ *
+ * Le vérificateur ne connaissait que les objets, pas l'ESPACE. Il prouvait
+ * qu'une solution existait sans jamais vérifier qu'on pouvait l'atteindre — or
+ * une chambre à enchaînements se casse exactement là :
+ *
+ *     l'outil qui sort la passerelle est de l'autre côté de la passerelle
+ *
+ * La salle est alors annoncée franchissable et ne l'est pas. Ce genre de blocage
+ * ne plante pas, ne lève rien, et coûte au joueur des heures avant l'abandon.
+ *
+ * On calcule donc un point fixe : avec ce qu'on atteint, qu'active-t-on ; avec ce
+ * qu'on active, qu'atteint-on de plus. La croissance est monotone, donc le calcul
+ * termine — au pire en autant de tours qu'il y a de zones.
+ */
+export function zonesAtteintes(salle, catalogue) {
+  const atteintes = new Set([ZONE_DEPART]);
+  const passerelles = salle.passerelles ?? [];
+  let progresse = true;
+
+  while (progresse) {
+    progresse = false;
+    const disponibles = catalogue.filter(
+      (entree) => atteintes.has(zoneDe(salle, entree.nom)));
+
+    // Faits obtenables ici et maintenant. Les réceptacles doivent être tenus
+    // SIMULTANÉMENT — d'où le couplage ; les terminaux ne sont qu'empruntés.
+    const exigences = Object.keys(salle.receptacles ?? {})
+      .filter((i) => atteintes.has(zoneDe(salle, i)))
+      .map((instance) => ({
+        id: instance,
+        candidats: objetsCapables(
+          { receptacle: typeDeReceptacle(salle.receptacles[instance]) }, disponibles)
+          .map((e) => e.nom),
+      }));
+    const faits = new Set(coupler(exigences).keys());
+
+    for (const instance of Object.keys(salle.terminaux ?? {})) {
+      if (!atteintes.has(zoneDe(salle, instance))) continue;
+      const type = typeDeReceptacle(salle.terminaux[instance]);
+      if (objetsCapables({ terminal: type }, disponibles).length > 0) faits.add(instance);
+    }
+    for (const passerelle of passerelles) {
+      if (evaluer(passerelle.condition, faits)) faits.add(passerelle.id);
+    }
+
+    for (const [zone, condition] of Object.entries(salle.zones ?? {})) {
+      if (atteintes.has(zone)) continue;
+      if (evaluer(condition, faits)) { atteintes.add(zone); progresse = true; }
+    }
+  }
+  return atteintes;
+}
+
 /**
  * Une salle peut-elle être terminée avec les objets qu'elle contient ?
  *
@@ -168,19 +229,34 @@ export function verifierSalle(salle, chercher) {
     if (!TERMINAUX[type]) return echec(salle, `terminal inconnu : ${instance} → ${type}`);
   }
 
+  // Seul ce que le joueur peut atteindre compte. Un objet posé derrière une
+  // passerelle qu'il faut d'abord sortir n'est pas une solution.
+  const atteintes = zonesAtteintes(salle, catalogue);
+  const horsAtteinte = Object.keys(salle.zones ?? {}).filter((z) => !atteintes.has(z));
+
   const instances = [
     ...Object.keys(salle.receptacles ?? {}),
     ...Object.keys(salle.terminaux ?? {}),
-  ];
+  ].filter((i) => atteintes.has(zoneDe(salle, i)));
+
+  // Seuls les objets des zones atteintes servent de solution. Un objet enfermé
+  // derrière une passerelle qu'il faut d'abord sortir n'en est pas une.
+  // Une zone hors d'atteinte n'est pas fatale en soi — ce peut être du décor.
+  // C'est seulement si la sortie en dépend que la salle est perdue, et la suite
+  // le dira avec un message qui nomme la zone.
+  const accessible = catalogue.filter((e) => atteintes.has(zoneDe(salle, e.nom)));
   const sortie = aplatirPasserelles(salle.sortie ?? { toutes: [] }, salle.passerelles ?? []);
   const combinaisons = combinaisonsSatisfaisantes(sortie, instances);
   if (combinaisons.length === 0) {
-    return echec(salle, 'aucune combinaison de mécanismes n\'ouvre la sortie');
+    return echec(salle, horsAtteinte.length
+      ? `aucune combinaison atteignable n'ouvre la sortie — zone(s) hors d'atteinte : `
+        + `${horsAtteinte.join(', ')}`
+      : 'aucune combinaison de mécanismes n\'ouvre la sortie');
   }
 
   const raisons = [];
   for (const combinaison of combinaisons) {
-    const verdict = tenter(salle, combinaison, catalogue);
+    const verdict = tenter(salle, combinaison, accessible);
     if (verdict.resoluble) return verdict;
     raisons.push(verdict.raison);
   }

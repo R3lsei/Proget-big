@@ -20,6 +20,8 @@
 //   receptacles  instance → { type, x, z } — maintenu par une PRÉSENCE
 //   terminaux    instance → { type, x, z } — déclenché par une ACTION, reste acquis
 //   passerelles  [{ id, x, z, largeur, longueur, condition }] — franchissables une fois sorties
+//   zones        zone → condition d'accès ; « depart » est toujours atteignable
+//   dans         objet | mécanisme → zone où il se trouve (défaut : « depart »)
 //   sortie       condition sur les instances (grammaire de utils/conditions)
 //   epreuves     [{ id, affordance }] outils nécessaires
 //   porte        { mur, ouverture }
@@ -77,6 +79,17 @@ const SERRE = {
     'pot de fleurs': { x: 1.6, z: 2.4 },
     tournevis: { x: 0.2, z: 1.2 },
     arrosoir: { x: 3.6, z: 0.6 },
+  },
+  // La plate-forme du fond n'est atteignable qu'une fois le pont sorti. Les
+  // OUTILS qui sortent le pont doivent donc rester du côté du départ : les
+  // placer au-delà rendrait la salle impossible tout en la laissant « prouvée »
+  // par un vérificateur qui ignore l'espace.
+  zones: {
+    plateforme: 'pont',
+  },
+  dans: {
+    plaque_gauche: 'plateforme',
+    plaque_droite: 'plateforme',
   },
   receptacles: {
     plaque_gauche: { type: 'plaque_pression', x: -3, z: -1 },

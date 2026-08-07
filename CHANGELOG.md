@@ -6,6 +6,20 @@ Versionnement [SemVer](https://semver.org/lang/fr/).
 ## [Non publié]
 
 ### Ajouté
+- **Le vérificateur comprend l'espace** (T-028) : il ne connaissait que les
+  objets. Il prouvait qu'une solution existe sans jamais vérifier qu'on peut
+  l'**atteindre** — et c'est exactement là que se cassent les chambres à
+  enchaînements :
+  *l'outil qui sort la passerelle se trouve de l'autre côté de la passerelle.*
+  Chaque exigence a une solution, la salle n'en a aucune, et le filet annonçait
+  « franchissable ».
+  Une chambre déclare désormais ses zones et ce qui en ouvre l'accès. La
+  vérification calcule un point fixe : avec ce qu'on atteint, qu'active-t-on ;
+  avec ce qu'on active, qu'atteint-on de plus. La croissance étant monotone, le
+  calcul termine toujours.
+  Il reste volontairement permissif là où il le faut : une passerelle sortie le
+  reste, donc un objet placé au-delà est récupérable et compte comme solution.
+  Une barrière qui crie à tort finit contournée.
 - **Terminaux piratables et passerelles** (T-026) : un terminal se déclenche par
   une **action** et reste **enclenché**, là où un réceptacle se maintient par une
   présence. La distinction n'est pas cosmétique : les confondre obligerait le

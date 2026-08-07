@@ -11,8 +11,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { chercher } from '../../game/js/perception/base/index.js';
+import { CHAMBRES } from '../../game/js/gameplay/chambres.js';
 import {
   MAX_RECEPTACLES, objetsCapables, coupler, verifierSalle, verifierParcours,
+  zonesAtteintes,
 } from '../../game/js/gameplay/resolubilite.js';
 
 const catalogue = (...noms) => noms.map(chercher);
@@ -264,4 +266,145 @@ test('un parcours entièrement soluble est déclaré soluble', () => {
   ], chercher);
   assert.equal(resoluble, true);
   assert.deepEqual(echecs, []);
+});
+
+// ─── Progression dans l'espace ──────────────────────────────────────────────
+//
+// Le vérificateur ne connaissait que les objets. Il prouvait qu'une solution
+// existe sans vérifier qu'on peut l'ATTEINDRE — le piège exact des chambres à
+// enchaînements, et un blocage que rien ne signale au joueur.
+
+test('une zone s\'ouvre quand son terminal est déclenché', () => {
+  const verdict = verifierSalle({
+    id: 'pont-ok',
+    objets: ['tournevis', 'brique'],
+    poses: {},
+    terminaux: { boitier: { type: 'boitier_commande' } },
+    passerelles: [{ id: 'pont', condition: 'boitier' }],
+    zones: { plateforme: 'pont' },
+    dans: { plaque: 'plateforme' },
+    receptacles: { plaque: { type: 'plaque_pression' } },
+    sortie: { toutes: ['plaque', 'pont'] },
+  }, chercher);
+  assert.equal(verdict.resoluble, true, verdict.raison);
+});
+
+test('l\'outil enfermé derrière sa propre passerelle est détecté', () => {
+  // LE piège des chaînes de mini-épreuves : l'objet qui sort le pont est de
+  // l'autre côté du pont. Chaque exigence a une solution, la salle n'en a pas.
+  const verdict = verifierSalle({
+    id: 'piege-spatial',
+    objets: ['tournevis', 'brique'],
+    terminaux: { boitier: { type: 'boitier_commande' } },
+    passerelles: [{ id: 'pont', condition: 'boitier' }],
+    zones: { plateforme: 'pont' },
+    // Le tournevis, seul objet conducteur, est SUR la plate-forme.
+    dans: { tournevis: 'plateforme', plaque: 'plateforme' },
+    receptacles: { plaque: { type: 'plaque_pression' } },
+    sortie: { toutes: ['plaque', 'pont'] },
+  }, chercher);
+  assert.equal(verdict.resoluble, false, 'le piège spatial est passé inaperçu');
+  assert.match(verdict.raison, /hors d'atteinte|plateforme/);
+});
+
+test('un objet derrière un pont déjà sorti reste utilisable', () => {
+  // Le vérificateur ne doit pas être trop strict : une passerelle reste sortie,
+  // donc le joueur traverse, récupère la brique et revient la poser. Refuser
+  // cette salle serait une fausse alarme — et une barrière qui crie à tort
+  // finit contournée.
+  const verdict = verifierSalle({
+    id: 'aller-retour',
+    objets: ['brique', 'éponge', 'tournevis'],
+    terminaux: { boitier: { type: 'boitier_commande' } },
+    passerelles: [{ id: 'pont', condition: 'boitier' }],
+    zones: { plateforme: 'pont' },
+    dans: { brique: 'plateforme' },
+    receptacles: { plaque: { type: 'plaque_pression' } },
+    sortie: { toutes: ['plaque', 'pont'] },
+  }, chercher);
+  assert.equal(verdict.resoluble, true, verdict.raison);
+});
+
+test('un objet enfermé derrière un pont qui ne sortira jamais est perdu', () => {
+  // Rien de conducteur ici : le boîtier ne se ponte pas, le pont ne sort pas, et
+  // la brique — seule chose lourde — reste inatteignable pour toujours.
+  const verdict = verifierSalle({
+    id: 'lest-enferme',
+    objets: ['brique', 'éponge'],
+    terminaux: { boitier: { type: 'boitier_commande' } },
+    passerelles: [{ id: 'pont', condition: 'boitier' }],
+    zones: { plateforme: 'pont' },
+    dans: { brique: 'plateforme' },
+    receptacles: { plaque: { type: 'plaque_pression' } },
+    sortie: { toutes: ['plaque', 'pont'] },
+  }, chercher);
+  assert.equal(verdict.resoluble, false, 'la brique enfermée passe pour une solution');
+});
+
+test('un objet enfermé ne sert à rien, même si le mécanisme est accessible', () => {
+  // Discriminant, contrairement au cas précédent : ici la plaque est au départ
+  // et le SEUL objet lourd est dans un coffre qui ne s'ouvrira jamais, faute de
+  // source de lumière. Sans filtrage par zone, le vérificateur compterait la
+  // brique et annoncerait une salle impossible comme franchissable.
+  const verdict = verifierSalle({
+    id: 'coffre-scelle',
+    objets: ['brique', 'éponge'],
+    terminaux: { lecteur: { type: 'lecteur_optique' } },
+    zones: { coffre: 'lecteur' },
+    dans: { brique: 'coffre' },
+    receptacles: { plaque: { type: 'plaque_pression' } },
+    sortie: 'plaque',
+  }, chercher);
+  assert.equal(verdict.resoluble, false,
+    'un objet enfermé à jamais compte comme solution');
+
+  // Contrôle : la même salle avec une lampe devient franchissable.
+  const avecLampe = verifierSalle({
+    id: 'coffre-ouvrable',
+    objets: ['brique', 'éponge', 'lampe torche'],
+    terminaux: { lecteur: { type: 'lecteur_optique' } },
+    zones: { coffre: 'lecteur' },
+    dans: { brique: 'coffre' },
+    receptacles: { plaque: { type: 'plaque_pression' } },
+    sortie: 'plaque',
+  }, chercher);
+  assert.equal(avecLampe.resoluble, true, avecLampe.raison);
+});
+
+test('la progression enchaîne plusieurs zones', () => {
+  // Deux verrous successifs : le premier terminal ouvre une zone qui contient
+  // de quoi déclencher le second.
+  const atteintes = zonesAtteintes({
+    objets: ['tournevis', 'lampe torche', 'brique'],
+    terminaux: {
+      boitier: { type: 'boitier_commande' },
+      lecteur: { type: 'lecteur_optique' },
+    },
+    passerelles: [
+      { id: 'pont1', condition: 'boitier' },
+      { id: 'pont2', condition: 'lecteur' },
+    ],
+    zones: { salle2: 'pont1', salle3: 'pont2' },
+    dans: { 'lampe torche': 'salle2', lecteur: 'salle2' },
+  }, ['tournevis', 'lampe torche', 'brique'].map(chercher));
+  assert.deepEqual([...atteintes].sort(), ['depart', 'salle2', 'salle3']);
+});
+
+test('une zone dont rien n\'ouvre l\'accès reste hors d\'atteinte', () => {
+  const atteintes = zonesAtteintes({
+    objets: ['éponge'],
+    terminaux: { boitier: { type: 'boitier_commande' } },
+    passerelles: [{ id: 'pont', condition: 'boitier' }],
+    zones: { plateforme: 'pont' },
+  }, [chercher('éponge')]);
+  assert.deepEqual([...atteintes], ['depart']);
+});
+
+test('la serre réelle est franchissable dans l\'ordre', () => {
+  // Confrontation à la chambre du jeu : les plaques sont au-delà du gouffre,
+  // les outils qui sortent le pont sont du bon côté.
+  const serre = CHAMBRES.find((c) => c.id === 'c02_serre');
+  const atteintes = zonesAtteintes(serre, serre.objets.map(chercher));
+  assert.ok(atteintes.has('plateforme'),
+    'la plate-forme de la serre est hors d\'atteinte');
 });
