@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>NOVA-7 — chambres</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0b0d0e; overflow: hidden;
+               font: 15px/1.5 system-ui, sans-serif; color: #eef3f4; }
+  canvas { display: block; width: 100vw; height: 100vh; }
+  #hud { position: fixed; inset: auto auto 1.5rem 50%; transform: translateX(-50%);
+         background: rgba(12,16,18,.78); padding: .6rem 1.1rem; border-radius: .4rem;
+         text-align: center; pointer-events: none; }
+  #aide { position: fixed; top: 1.2rem; left: 1.2rem; background: rgba(12,16,18,.78);
+          padding: .7rem 1rem; border-radius: .4rem; border-left: 3px solid #45d19a; }
+  #aide b { color: #45d19a; font-weight: 600; }
+  #mire { position: fixed; left: 50%; top: 50%; width: 8px; height: 8px;
+          margin: -4px 0 0 -4px; border: 1px solid rgba(255,255,255,.75);
+          border-radius: 50%; pointer-events: none; }
+  #etat { position: fixed; top: 1.2rem; right: 1.2rem; background: rgba(12,16,18,.78);
+          padding: .7rem 1rem; border-radius: .4rem; font-variant-numeric: tabular-nums; }
+  .ouverte { color: #45d19a; } .fermee { color: #ff7a5c; }
+</style>
+</head>
+<body>
+<canvas id="vue"></canvas>
+<div id="mire"></div>
+<div id="aide">
+  <b>ZQSD</b> se déplacer · <b>souris</b> regarder · <b>espace</b> sauter<br>
+  <b>E</b> prendre / poser · <b>clic</b> capturer la souris
+</div>
+<div id="etat"></div>
+<div id="hud">Cliquez pour commencer.</div>
+
+<script type="importmap">
+{ "imports": { "three": "./lib/three.module.js" } }
+</script>
+<script type="module">
+import { demarrer } from './js/app/partie.js';
+
+const canvas = document.getElementById('vue');
+canvas.width = innerWidth; canvas.height = innerHeight;
+
+const partie = demarrer(canvas, Number(new URLSearchParams(location.search).get('c') ?? 0));
+window.NOVA = partie;
+
+const hud = document.getElementById('hud');
+const etat = document.getElementById('etat');
+
+setInterval(() => {
+  hud.textContent = partie.dernierMessage
+    || (partie.vise ? `E — prendre ${partie.vise}` : 'Cliquez pour capturer la souris.');
+  etat.innerHTML = `${partie.chambre.titre}<br>`
+    + `mécanismes actifs : ${partie.actifs.size} / ${partie.bati.receptacles.size}<br>`
+    + `<span class="${partie.ouverte ? 'ouverte' : 'fermee'}">`
+    + `porte ${partie.ouverte ? 'ouverte' : 'fermée'}</span>`;
+}, 120);
+
+addEventListener('resize', () => {
+  canvas.width = innerWidth; canvas.height = innerHeight;
+  partie.renderer.setSize(innerWidth, innerHeight);
+  partie.camera.aspect = innerWidth / innerHeight;
+  partie.camera.updateProjectionMatrix();
+});
+</script>
+</body>
+</html>

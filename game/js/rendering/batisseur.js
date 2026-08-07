@@ -17,10 +17,11 @@
 // donc un mur qu'on voit est un mur qui arrête.
 
 import * as THREE from 'three';
-import { depuisBox3 } from '../physics/aabb.js';
+import { depuisBox3, depuisCentre } from '../physics/aabb.js';
+import { chercher } from '../perception/base/index.js';
 import {
   MODULE, HAUTEUR_CHAMBRE,
-  sol, mur, murPerce, porte, verriere, jardiniere, lierre, socleReceptacle,
+  sol, mur, murPerce, porte, verriere, jardiniere, lierre, socleReceptacle, materiaux,
 } from './kit.js';
 
 /**
@@ -129,8 +130,61 @@ export function batir(chambre) {
     groupe,
     colliders,
     receptacles,
+    objets: poserObjets(chambre, groupe),
     porte: { groupe: vantaux, ouvrir: vantaux.userData.ouvrir },
   };
+}
+
+/** Gabarit d'un objet transportable : petit, cubique, franchissable en marchant. */
+export const GABARIT_OBJET = Object.freeze({ rayon: 0.16, hauteur: 0.32 });
+
+/**
+ * Matérialise les objets de la chambre à leurs poses déclarées.
+ *
+ * La preuve de résolubilité suppose que ces objets sont ATTEIGNABLES. Un objet
+ * déclaré mais jamais posé rendrait la preuve fausse : le vérificateur dirait
+ * la salle franchissable, et le joueur ne trouverait rien. Un test exige donc
+ * une pose pour chaque objet.
+ */
+function poserObjets(chambre, groupe) {
+  const objets = new Map();
+  const m = materiaux();
+
+  for (const nom of chambre.objets ?? []) {
+    const pose = chambre.poses?.[nom];
+    if (!pose) continue;
+    const entree = chercher(nom);
+    if (!entree) continue;
+
+    const lourd = entree.proprietes.includes('lourd');
+    const taille = lourd ? 0.32 : 0.24;
+    const maillage = new THREE.Mesh(
+      new THREE.BoxGeometry(taille, taille, taille),
+      lourd ? m.structure : m.panneau_use);
+    maillage.castShadow = true;
+    maillage.receiveShadow = true;
+    maillage.name = `objet_${nom}`;
+
+    const corps = {
+      nom,
+      proprietes: entree.proprietes,
+      x: enMetres(pose.x), y: 0, z: enMetres(pose.z),
+      vy: 0, auSol: true,
+      maillage,
+      gabarit: { rayon: taille / 2, hauteur: taille },
+    };
+    maillage.position.set(corps.x, taille / 2, corps.z);
+    groupe.add(maillage);
+    objets.set(nom, corps);
+  }
+  return objets;
+}
+
+/** Boîte englobante d'un objet transportable, à sa position courante. */
+export function boiteObjet(corps) {
+  return depuisCentre(
+    corps.x, corps.y + corps.gabarit.hauteur / 2, corps.z,
+    corps.gabarit.rayon * 2, corps.gabarit.hauteur, corps.gabarit.rayon * 2);
 }
 
 /**

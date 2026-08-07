@@ -97,20 +97,24 @@ test('activePar accepte tableau, Set ou rien', () => {
 // ─── Circuits ───────────────────────────────────────────────────────────────
 
 test('les réceptacles actifs se déduisent de leurs occupants', () => {
+  // Les instances portent des noms PROPRES à la chambre, différents de leur
+  // type. Les confondre a masqué un défaut jusqu'au premier assemblage complet :
+  // le type était cherché sous le nom de l'instance, et le mécanisme ne
+  // s'activait jamais.
   const actifs = receptaclesActifs({
-    plaque_pression: { proprietes: proprietesDe('brique') },
-    rail_magnetique: { proprietes: proprietesDe('éponge') },
-    socle_conducteur: null,
+    plaque_gauche: { type: 'plaque_pression', proprietes: proprietesDe('brique') },
+    rail_du_fond: { type: 'rail_magnetique', proprietes: proprietesDe('éponge') },
+    borne_nord: null,
   });
-  assert.deepEqual([...actifs], ['plaque_pression']);
+  assert.deepEqual([...actifs], ['plaque_gauche']);
 });
 
 test('un occupant joueur n\'active pas ce qui le refuse', () => {
   const actifs = receptaclesActifs({
-    plaque_pression: { proprietes: PROPRIETES_JOUEUR, estLeJoueur: true },
-    plaque_sensible: { proprietes: PROPRIETES_JOUEUR, estLeJoueur: true },
+    dalle_a: { type: 'plaque_pression', proprietes: PROPRIETES_JOUEUR, estLeJoueur: true },
+    dalle_b: { type: 'plaque_sensible', proprietes: PROPRIETES_JOUEUR, estLeJoueur: true },
   });
-  assert.deepEqual([...actifs], ['plaque_sensible']);
+  assert.deepEqual([...actifs], ['dalle_b']);
 });
 
 test('receptaclesActifs supporte l\'absence totale d\'occupation', () => {

@@ -16,6 +16,7 @@
 //   etat         'soigne' | 'envahi' — décide des matières et de l'ambiance
 //   taille       { largeur, profondeur } en modules de 1,2 m
 //   objets       objets PRÉSENTS dans la pièce, noms de la base curatée
+//   poses        objet → { x, z } en modules — où il repose au départ
 //   receptacles  instance → { type, x, z } — type dans mecanismes.js, position en modules
 //   sortie       condition sur les instances (grammaire de utils/conditions)
 //   epreuves     [{ id, affordance }] outils nécessaires
@@ -37,6 +38,12 @@ const REVEIL = {
   // Deux objets lourds pour une seule plaque : la chambre reste franchissable
   // même si le joueur en perd un, et il découvre que plusieurs choses marchent.
   objets: ['brique', 'caillou', 'couteau', 'éponge'],
+  poses: {
+    brique: { x: -1.8, z: 1.2 },
+    caillou: { x: 1.9, z: 0.4 },
+    couteau: { x: 0.6, z: 2.4 },
+    'éponge': { x: -2.4, z: 2.6 },
+  },
   receptacles: {
     plaque: { type: 'plaque_pression', x: 0, z: -1.5 },
   },
@@ -60,6 +67,12 @@ const SERRE = {
   // détecter, et la raison pour laquelle il ne se contente pas d'une suite de
   // vérifications indépendantes.
   objets: ['brique', 'pot de fleurs', 'tournevis', 'arrosoir'],
+  poses: {
+    brique: { x: -1.4, z: 2.2 },
+    'pot de fleurs': { x: 1.6, z: 2.4 },
+    tournevis: { x: 0.2, z: 1.2 },
+    arrosoir: { x: 3.6, z: 0.6 },
+  },
   receptacles: {
     plaque_gauche: { type: 'plaque_pression', x: -3, z: -1 },
     plaque_droite: { type: 'plaque_pression', x: 3, z: -1 },

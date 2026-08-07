@@ -6,6 +6,11 @@ Versionnement [SemVer](https://semver.org/lang/fr/).
 ## [Non publié]
 
 ### Ajouté
+- **Le jeu tourne** (T-025) : le joueur est branché sur les chambres. Se
+  déplacer, regarder, sauter, prendre et poser. La boucle complète est vérifiée
+  dans un vrai navigateur : marcher jusqu'à la brique, la porter sur la plaque,
+  la porte s'ouvre et se franchit. Tous les modules existaient et étaient testés
+  séparément ; c'est leur enchaînement qui n'avait jamais tourné.
 - **Chambres déclarées** (T-022) : une seule déclaration par chambre, lue par
   deux programmes qui n'ont rien à voir — le bâtisseur 3D la construit, le
   vérificateur de résolubilité la prouve franchissable. Ailleurs, le niveau et
@@ -144,6 +149,17 @@ Versionnement [SemVer](https://semver.org/lang/fr/).
 - Lumières : 25 sources → pool de 6 suivant le joueur, coût de shader constant.
 
 ### Corrigé
+- **Mécanismes jamais activés en jeu** (B-022) : `receptaclesActifs` cherchait le
+  type du réceptacle sous le nom de son INSTANCE. Une chambre nomme ses
+  mécanismes librement — « plaque_gauche » — et ce nom n'existe évidemment pas
+  dans le catalogue des types : la plaque ne s'activait jamais, sans message.
+  Invisible jusqu'au premier assemblage complet, parce que les tests unitaires
+  nommaient les instances comme leur type et masquaient la confusion.
+- **Déplacement dépendant de la fréquence d'images** (B-023) : chaque image
+  appliquait un pas borné, si bien qu'une machine lente déplaçait le joueur
+  moins vite en temps réel — 0,84 m parcourus au lieu de 3,50 lors du premier
+  essai en navigateur. Remplacé par un pas de simulation fixe, découplé de
+  l'affichage.
 - **Deux conventions cardinales contradictoires** (B-020) : « nord » désignait
   +Z pour placer les murs et −Z pour orienter le joueur. Résultat : le joueur
   démarrait collé à la porte de sortie et regardait dedans. Une seule normale

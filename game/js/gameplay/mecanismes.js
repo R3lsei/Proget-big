@@ -138,8 +138,16 @@ export function activePar(idReceptacle, proprietes, { estLeJoueur = false } = {}
 /**
  * Réceptacles actifs, à partir de ce qui repose sur chacun.
  *
- * `occupations` associe un identifiant de réceptacle à son occupant :
- *   { proprietes: [...], estLeJoueur: false }  — ou `null` si rien n'y repose.
+ * `occupations` associe une INSTANCE de réceptacle à son occupant :
+ *   { type: 'plaque_pression', proprietes: [...], estLeJoueur: false }
+ * ou `null` si rien n'y repose.
+ *
+ * Le type est obligatoire et distinct de l'instance. Une chambre nomme ses
+ * mécanismes librement — « plaque_gauche », « plaque_droite » — et rien ne dit
+ * de quel type ils sont. Confondre les deux fait chercher un réceptacle nommé
+ * « plaque_gauche » dans le catalogue, où il n'existe pas : le mécanisme ne
+ * s'active jamais et rien ne le signale. C'est ce qu'a révélé le premier
+ * assemblage complet du jeu.
  *
  * Renvoie un `Set`, directement évaluable par la grammaire de conditions : c'est
  * ce qui permet à une porte de s'exprimer en `{ toutes: ['plaque_a', 'plaque_b'] }`
@@ -147,10 +155,10 @@ export function activePar(idReceptacle, proprietes, { estLeJoueur = false } = {}
  */
 export function receptaclesActifs(occupations) {
   const actifs = new Set();
-  for (const [id, occupant] of Object.entries(occupations ?? {})) {
+  for (const [instance, occupant] of Object.entries(occupations ?? {})) {
     if (!occupant) continue;
-    if (activePar(id, occupant.proprietes, { estLeJoueur: occupant.estLeJoueur })) {
-      actifs.add(id);
+    if (activePar(occupant.type, occupant.proprietes, { estLeJoueur: occupant.estLeJoueur })) {
+      actifs.add(instance);
     }
   }
   return actifs;

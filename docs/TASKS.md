@@ -19,6 +19,7 @@
 
 | ID | Tâche | Dépend de |
 |---|---|---|
+| T-026 | **Caméra dans les chambres** : l'objet scanné se matérialise et sert de solution | T-025 ✅ |
 | T-013 | Repli sémantique hors base | T-011 ✅ |
 | T-016 | Mesure embarquée de la latence de scan | T-012 ✅ |
 | T-015 | Grammaire d'énigmes et chargeur de salles | T-012 ✅ |
@@ -36,6 +37,7 @@
 | T-000 | Conception validée (7 axes) | SPEC, GAMEPLAY, ARCHITECTURE écrits |
 | T-000b | Faisabilité open-vocabulary | transformers.js v4.2.0 disponible, bundle autonome 510 Ko, WebGPU détecté |
 | T-000c | Banc de mesure livré | `tools/spike-detection/`, zéro erreur JS |
+| T-025 | **Le jeu tourne** | Joueur branché sur les chambres : ZQSD, souris, saut, prendre/poser. Boucle complète vérifiée en navigateur — marcher jusqu'à la brique, la poser sur la plaque, voir la porte s'ouvrir, la franchir. 15 tests dont l'intégration de bout en bout. A révélé le défaut de type/instance et un déplacement dépendant de la fréquence d'images |
 | T-022 | Chambres déclarées | **Un fichier, deux lecteurs** : la même déclaration nourrit le bâtisseur 3D et le vérificateur de résolubilité. Rien à synchroniser, donc rien à oublier. Deux chambres réelles bâties et prouvées. La barrière anti-blocage protège désormais de vraies salles. Colliders dérivés de la géométrie posée, position de départ calculée. 16 tests ; a trouvé deux conventions cardinales contradictoires et un décor placé hors de la pièce |
 | T-021 | Végétation à base de vrais modèles | Chaîne complète établie : récupération de modèles libres, simplification, compression Draco + WebP, instanciation. Plante en pot 5,8 Mo → 1,1 Mo, version lointaine à 12 % → 516 Ko. Un massif coûte un appel de dessin par partie du modèle, pas un par plante. Crédits vérifiés par test — l'oubli d'une licence sur la version dérivée a été rattrapé en dix minutes. 11 tests |
 | T-020 | Kit modulaire et direction artistique | Refonte de la carte engagée : grille de 1,2 m, panneaux à joints creux, verrières, un soleil unique porteur d'ombres à la place de vingt lampes ponctuelles. Deux états du lieu — cœur soigné, périphérie envahie. Palette gelée en trois familles. 24 tests verrouillant les invariants invisibles à l'œil : matériaux partagés, feuillage instancié, décor déterministe, lierre plaqué. **Végétation encore insuffisante** — voir T-021 |
