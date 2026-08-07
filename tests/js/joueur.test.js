@@ -18,7 +18,7 @@ import { PORTEE_SAISIE } from '../../game/js/physics/portage.js';
 import { MODULE } from '../../game/js/rendering/kit.js';
 import {
   GABARIT, creerJoueur, regarder, avancer, basculerPrise, lacher,
-  majObjets, occupations, objetVise,
+  majObjets, occupations, objetVise, restaurerEgares,
 } from '../../game/js/app/joueur.js';
 
 const AUCUNE = { avancer: false, reculer: false, gauche: false, droite: false, sauter: false };
@@ -304,4 +304,126 @@ test('un objet léger ne suffit pas à maintenir une plaque de pression', () => 
   simuler(joueur, objets, bati, 0.3);
   const actifs = receptaclesActifs(occupations(joueur, objets, bati.receptacles));
   assert.equal(actifs.has('plaque'), false, 'une éponge enfonce la plaque');
+});
+
+// ─── Le gouffre : la déclaration doit être PHYSIQUE ─────────────────────────
+//
+// Le vérificateur affirme que la plate-forme n'est atteignable qu'une fois le
+// pont sorti. Si le sol est plein, cette affirmation est un mensonge : le
+// joueur y marche, et toute la preuve de progression ne vaut plus rien.
+// Ces tests relient donc ce qui est déclaré à ce qui est bâti.
+
+test('le gouffre déclaré est réellement creusé', () => {
+  const serre = CHAMBRES.find((c) => c.id === 'c02_serre');
+  const { colliders } = batir(serre);
+  const centre = {
+    x: (serre.gouffre.xMin + serre.gouffre.xMax) / 2 * MODULE,
+    z: (serre.gouffre.zMin + serre.gouffre.zMax) / 2 * MODULE,
+  };
+  const solSousLeVide = colliders.filter((c) =>
+    c.maxY <= 0.01 && c.minX < centre.x && c.maxX > centre.x
+    && c.minZ < centre.z && c.maxZ > centre.z);
+  assert.deepEqual(solSousLeVide, [], 'le gouffre a du sol : les zones sont fictives');
+});
+
+test('sans le pont, on tombe en tentant de rejoindre les plaques', () => {
+  // Le test qui vérifie que la géométrie tient la promesse de la déclaration.
+  const { chambre, joueur, objets, bati } = partie(1);
+  teleporter(joueur, 0, 0);
+  joueur.yaw = 0; // face au gouffre, donc vers les plaques
+  simuler(joueur, objets, bati, 2.5, intentions({ avancer: true }));
+  assert.ok(joueur.y < -0.5, `le joueur a traversé le gouffre à pied (y=${joueur.y.toFixed(2)})`);
+});
+
+test('le pont déployé rend la plate-forme franchissable', () => {
+  const { chambre, joueur, objets, bati } = partie(1);
+  const pont = bati.passerelles.get('pont');
+  const obstacles = [...bati.colliders, pont.collider];
+  teleporter(joueur, 0, 0);
+  joueur.yaw = 0;
+  // Juste assez pour franchir le gouffre et poser le pied sur la plate-forme.
+  // Plus longtemps, le joueur ressort par la porte et tombe hors du monde —
+  // ce que le filet rattrape, mais qui ne dit rien sur le pont.
+  for (let i = 0; i < 80; i++) {
+    avancer(joueur, intentions({ avancer: true }), obstacles, 1 / 60);
+    majObjets(joueur, objets, obstacles, 1 / 60);
+  }
+  const bordLoin = chambre.gouffre.zMin * MODULE;
+  assert.ok(joueur.y > -0.5, `le joueur est tombé malgré le pont (y=${joueur.y.toFixed(2)})`);
+  assert.ok(joueur.z < bordLoin,
+    `le joueur n'a pas franchi le gouffre (z=${joueur.z.toFixed(2)}, bord ${bordLoin.toFixed(2)})`);
+});
+
+// ─── Restauration ───────────────────────────────────────────────────────────
+
+test('un objet tombé dans le gouffre revient à sa place', () => {
+  // Sans cela, un geste maladroit rend la salle insoluble — et le vérificateur,
+  // qui raisonne sur l'état initial, ne peut rien y voir. Supprimer la classe de
+  // problème coûte moins cher que prouver qu'elle n'arrive jamais.
+  const { chambre, joueur, objets, bati } = partie(1);
+  const brique = bati.objets.get('brique');
+  const origine = { ...brique.origine };
+  brique.y = -8;
+
+  const bilan = restaurerEgares(joueur, objets, departDe(chambre));
+  assert.deepEqual(bilan.objets, ['brique']);
+  assert.equal(brique.x, origine.x);
+  assert.equal(brique.z, origine.z);
+  assert.equal(brique.vy, 0);
+});
+
+test('la salle reste soluble après avoir jeté tout ce qu\'on peut', () => {
+  // Simulation du pire joueur possible : tout balancer dans le vide. Chaque
+  // objet doit revenir, sinon la chambre devient insoluble sans aucun message.
+  const { chambre, joueur, objets, bati } = partie(1);
+  for (const corps of objets) corps.y = -12;
+  restaurerEgares(joueur, objets, departDe(chambre));
+  for (const corps of objets) {
+    assert.ok(corps.y > -1, `${corps.nom} est resté au fond du gouffre`);
+  }
+});
+
+test('le joueur tombé réapparaît au départ sans rien perdre', () => {
+  // La chute est une erreur de parcours, pas une punition : sanctionner
+  // pousserait à jouer prudemment plutôt qu'à essayer.
+  const { chambre, joueur, objets, bati } = partie(1);
+  const depart = departDe(chambre);
+  joueur.y = -10;
+  const bilan = restaurerEgares(joueur, objets, depart);
+  assert.equal(bilan.joueurTombe, true);
+  assert.equal(joueur.x, depart.x);
+  assert.equal(joueur.z, depart.z);
+  assert.equal(joueur.vy, 0);
+});
+
+test('un objet tenu et lâché dans le vide n\'est plus tenu', () => {
+  // Sinon le joueur remonterait en tenant un objet resté au fond, et la
+  // restauration le téléporterait dans ses mains depuis nulle part.
+  const { chambre, joueur, objets, bati } = partie(1);
+  joueur.porte = bati.objets.get('brique');
+  joueur.porte.y = -9;
+  restaurerEgares(joueur, objets, departDe(chambre));
+  assert.equal(joueur.porte, null);
+});
+
+test('un objet invoqué tombé est rendu, pas restauré', () => {
+  // Le faire réapparaître au fond d'une salle qu'on a quittée serait
+  // incompréhensible ; il retourne à l'inventaire et libère sa place.
+  const { chambre, joueur, objets } = partie(1);
+  const invoque = {
+    nom: 'marteau', invoque: true, proprietes: ['lourd'],
+    x: 0, y: -7, z: 0, vy: 0, gabarit: { rayon: 0.16, hauteur: 0.32 },
+  };
+  objets.push(invoque);
+  const bilan = restaurerEgares(joueur, objets, departDe(chambre));
+  assert.deepEqual(bilan.rendus, ['marteau']);
+  assert.equal(objets.includes(invoque), false);
+});
+
+test('rien ne bouge tant que rien n\'est tombé', () => {
+  const { chambre, joueur, objets } = partie(1);
+  const avant = objets.map((c) => `${c.x},${c.y},${c.z}`);
+  const bilan = restaurerEgares(joueur, objets, departDe(chambre));
+  assert.deepEqual(bilan, { objets: [], joueurTombe: false, rendus: [] });
+  assert.deepEqual(objets.map((c) => `${c.x},${c.y},${c.z}`), avant);
 });

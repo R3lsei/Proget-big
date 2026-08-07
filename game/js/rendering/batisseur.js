@@ -61,13 +61,16 @@ export function batir(chambre) {
   groupe.name = `chambre_${chambre.id}`;
   const colliders = [];
 
-  groupe.add(sol({ largeur, profondeur, etat }));
-
   // Le sol est un collider comme les autres : sans lui, le joueur tombe
   // indéfiniment dès la première image, avant même d'avoir pu bouger.
-  colliders.push(depuisBox3(new THREE.Box3(
-    new THREE.Vector3(-enMetres(largeur) / 2, -0.5, -enMetres(profondeur) / 2),
-    new THREE.Vector3(enMetres(largeur) / 2, 0, enMetres(profondeur) / 2))));
+  for (const dalle of decouperSol(chambre)) {
+    const piece = sol({ largeur: dalle.largeur, profondeur: dalle.profondeur, etat });
+    piece.position.set(dalle.x, 0, dalle.z);
+    groupe.add(piece);
+    colliders.push(depuisCentre(
+      dalle.x, -0.25, dalle.z,
+      enMetres(dalle.largeur), 0.5, enMetres(dalle.profondeur)));
+  }
 
   const murDeSortie = chambre.porte?.mur ?? 'nord';
   for (const [orientation, { rotation }] of Object.entries(ORIENTATIONS)) {
@@ -145,9 +148,11 @@ export function batir(chambre) {
       // Le collider n'est pas ajouté à la liste : il n'existe que déployé, et
       // c'est la boucle de jeu qui l'y met. Un pont rentré sur lequel on marche
       // quand même serait le pire des deux mondes.
+      // Même forme qu'une dalle de sol : un pont se marche dessus, il ne se
+      // franchit pas comme un obstacle.
       collider: depuisCentre(
-        enMetres(decl.x ?? 0), 0.06, enMetres(decl.z ?? 0),
-        (decl.largeur ?? 2) * MODULE, 0.12, (decl.longueur ?? 3) * MODULE),
+        enMetres(decl.x ?? 0), -0.25, enMetres(decl.z ?? 0),
+        (decl.largeur ?? 2) * MODULE, 0.5, (decl.longueur ?? 3) * MODULE),
     });
   }
 
@@ -172,6 +177,59 @@ export function batir(chambre) {
     objets: poserObjets(chambre, groupe),
     porte: { groupe: vantaux, ouvrir: vantaux.userData.ouvrir },
   };
+}
+
+/**
+ * Découpe le sol en dalles, en laissant le gouffre vide.
+ *
+ * Sans cela, les zones d'une chambre ne seraient que des mots : le vérificateur
+ * jurerait que la plate-forme n'est atteignable qu'une fois le pont sorti, et le
+ * joueur y marcherait tranquillement sur un sol plein. C'est précisément la
+ * divergence entre déclaration et géométrie que le fichier unique devait
+ * empêcher — elle s'était réintroduite par le sol.
+ *
+ * Découpe en bandes plutôt qu'en trou percé : quatre rectangles restent des
+ * boîtes, donc des colliders exacts. Une géométrie percée demanderait un maillage
+ * de collision, pour un décor qui n'en a pas besoin.
+ */
+function decouperSol(chambre) {
+  const { largeur, profondeur } = chambre.taille;
+  const gouffre = chambre.gouffre;
+  if (!gouffre) return [{ x: 0, z: 0, largeur, profondeur }];
+
+  const dalles = [];
+  const avant = gouffre.zMin + profondeur / 2;
+  const arriere = profondeur / 2 - gouffre.zMax;
+  if (avant > 0) {
+    dalles.push({
+      x: 0, z: enMetres((gouffre.zMin + -profondeur / 2) / 2),
+      largeur, profondeur: avant,
+    });
+  }
+  if (arriere > 0) {
+    dalles.push({
+      x: 0, z: enMetres((gouffre.zMax + profondeur / 2) / 2),
+      largeur, profondeur: arriere,
+    });
+  }
+  const gauche = gouffre.xMin + largeur / 2;
+  const droite = largeur / 2 - gouffre.xMax;
+  const profondeurGouffre = gouffre.zMax - gouffre.zMin;
+  if (gauche > 0) {
+    dalles.push({
+      x: enMetres((gouffre.xMin + -largeur / 2) / 2),
+      z: enMetres((gouffre.zMin + gouffre.zMax) / 2),
+      largeur: gauche, profondeur: profondeurGouffre,
+    });
+  }
+  if (droite > 0) {
+    dalles.push({
+      x: enMetres((gouffre.xMax + largeur / 2) / 2),
+      z: enMetres((gouffre.zMin + gouffre.zMax) / 2),
+      largeur: droite, profondeur: profondeurGouffre,
+    });
+  }
+  return dalles;
 }
 
 /** Gabarit d'un objet transportable : petit, cubique, franchissable en marchant. */
@@ -210,6 +268,11 @@ function poserObjets(chambre, groupe) {
       x: enMetres(pose.x), y: 0, z: enMetres(pose.z),
       vy: 0, auSol: true,
       maillage,
+      // Position d'origine, gardée pour la restauration : un objet tombé dans le
+      // gouffre y revient. Sans elle, un geste maladroit rendrait la salle
+      // insoluble — et le vérificateur, qui raisonne sur l'état initial, ne
+      // pourrait rien y voir.
+      origine: { x: enMetres(pose.x), y: 0, z: enMetres(pose.z) },
       gabarit: { rayon: taille / 2, hauteur: taille },
     };
     maillage.position.set(corps.x, taille / 2, corps.z);

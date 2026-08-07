@@ -212,3 +212,39 @@ test('la chambre bâtie tient dans les dimensions déclarées', () => {
       `${chambre.id} dépasse en hauteur`);
   }
 });
+
+// ─── Passerelle : ce qu'on voit doit être ce sur quoi on marche ─────────────
+
+test('la face visible de la passerelle est au niveau de son collider', () => {
+  // Le tablier dessiné et la boîte de collision sont deux objets distincts :
+  // rien n'empêche l'un de flotter douze centimètres au-dessus de l'autre. Le
+  // joueur verrait alors une plate-forme et marcherait à côté — ou pire, se
+  // cognerait à une marche invisible. C'est la divergence décor/physique que le
+  // fichier unique de chambre existe pour éliminer, et elle se réintroduit ici
+  // par une simple constante.
+  const serre = CHAMBRES.find((c) => c.id === 'c02_serre');
+  const { passerelles } = batir(serre);
+  for (const [id, pont] of passerelles) {
+    pont.deployer(1);
+    pont.groupe.updateMatrixWorld(true);
+    const visible = new THREE.Box3().setFromObject(pont.groupe);
+    assert.ok(Math.abs(visible.max.y - pont.collider.maxY) < 0.02,
+      `${id} : tablier visible à ${visible.max.y.toFixed(3)}, `
+      + `collider à ${pont.collider.maxY.toFixed(3)}`);
+  }
+});
+
+test('la passerelle rentrée disparaît sous le bord', () => {
+  // Un tablier laissé flottant au milieu du vide dirait au joueur qu'il peut
+  // passer alors que rien ne le porte.
+  const serre = CHAMBRES.find((c) => c.id === 'c02_serre');
+  const { passerelles } = batir(serre);
+  for (const [id, pont] of passerelles) {
+    pont.deployer(0);
+    pont.groupe.updateMatrixWorld(true);
+    const boite = new THREE.Box3().setFromObject(pont.groupe);
+    assert.ok(boite.max.y < -0.2 || boite.min.z < -100 || !pont.groupe.visible
+      || pont.groupe.children.every((c) => !c.visible),
+      `${id} : la passerelle rentrée reste visible en l'air`);
+  }
+});

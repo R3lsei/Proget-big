@@ -20,6 +20,7 @@
 //   receptacles  instance → { type, x, z } — maintenu par une PRÉSENCE
 //   terminaux    instance → { type, x, z } — déclenché par une ACTION, reste acquis
 //   passerelles  [{ id, x, z, largeur, longueur, condition }] — franchissables une fois sorties
+//   gouffre      { xMin, xMax, zMin, zMax } en modules — le sol y est absent
 //   zones        zone → condition d'accès ; « depart » est toujours atteignable
 //   dans         objet | mécanisme → zone où il se trouve (défaut : « depart »)
 //   sortie       condition sur les instances (grammaire de utils/conditions)
@@ -84,6 +85,9 @@ const SERRE = {
   // OUTILS qui sortent le pont doivent donc rester du côté du départ : les
   // placer au-delà rendrait la salle impossible tout en la laissant « prouvée »
   // par un vérificateur qui ignore l'espace.
+  // Le gouffre rend la séparation RÉELLE. Sans lui, les zones ne seraient que
+  // des mots et le joueur marcherait jusqu'aux plaques sur un sol plein.
+  gouffre: { xMin: -5, xMax: 5, zMin: -3.6, zMax: -1.6 },
   zones: {
     plateforme: 'pont',
   },
@@ -92,8 +96,8 @@ const SERRE = {
     plaque_droite: 'plateforme',
   },
   receptacles: {
-    plaque_gauche: { type: 'plaque_pression', x: -3, z: -1 },
-    plaque_droite: { type: 'plaque_pression', x: 3, z: -1 },
+    plaque_gauche: { type: 'plaque_pression', x: -3, z: -0.8 },
+    plaque_droite: { type: 'plaque_pression', x: 3, z: -0.8 },
   },
   terminaux: {
     // DEUX voies pour la même passerelle : la console demande de l'informatique,
@@ -106,7 +110,7 @@ const SERRE = {
   passerelles: [
     {
       id: 'pont',
-      x: 0, z: -2.4, largeur: 2, longueur: 3,
+      x: 0, z: -2.6, largeur: 2, longueur: 2,
       condition: { auMoins: ['console', 'boitier'] },
     },
   ],

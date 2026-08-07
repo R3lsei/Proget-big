@@ -543,7 +543,11 @@ export function passerelle({ largeur = 2, longueur = 3, etat = 'soigne' } = {}) 
     // Rentrée, la passerelle glisse sous le bord : elle disparaît sans laisser
     // un tablier flottant au milieu du vide.
     tablier.position.z = -course * (1 - p);
-    tablier.position.y = 0.06 - (1 - p) * 0.4;
+    // Déployée, sa face supérieure est à hauteur du plancher. Une passerelle en
+    // surépaisseur devient une marche de douze centimètres : la résolution de
+    // collisions la traite comme un mur, et le joueur se cogne à un pont qu'il
+    // voit pourtant sorti.
+    tablier.position.y = -0.06 - (1 - p) * 0.4;
     tablier.visible = p > 0.02;
   };
   groupe.userData.deployer(0);

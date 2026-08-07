@@ -6,6 +6,19 @@ Versionnement [SemVer](https://semver.org/lang/fr/).
 ## [Non publié]
 
 ### Ajouté
+- **Gouffre réel et restauration de ce qui tombe** (T-029) : les zones d'une
+  chambre n'étaient que des mots. Le vérificateur jurait que la plate-forme
+  n'était atteignable qu'une fois le pont sorti, et le joueur y marchait
+  tranquillement sur un sol plein — la divergence décor / règles que le fichier
+  unique de chambre devait interdire, réintroduite par le sol. Le gouffre est
+  maintenant creusé : la séparation est physique, et un test le vérifie en
+  faisant marcher le joueur dans le vide.
+  Tout ce qui y tombe remonte : un objet retrouve sa place, le joueur réapparaît
+  au départ sans rien perdre, un objet invoqué retourne à l'inventaire et libère
+  sa place. Le vérificateur raisonne sur l'état initial et ne peut pas voir ce
+  que le joueur détruit en chemin ; plutôt que de prouver qu'aucune séquence
+  d'actions n'est fatale — coûteux et fragile — la classe de problème est
+  supprimée. C'est la solution de Portal, pour la même raison.
 - **Le vérificateur comprend l'espace** (T-028) : il ne connaissait que les
   objets. Il prouvait qu'une solution existe sans jamais vérifier qu'on peut
   l'**atteindre** — et c'est exactement là que se cassent les chambres à
@@ -185,6 +198,12 @@ Versionnement [SemVer](https://semver.org/lang/fr/).
 - Lumières : 25 sources → pool de 6 suivant le joueur, coût de shader constant.
 
 ### Corrigé
+- **Passerelle infranchissable alors qu'elle est sortie** (B-024) : son tablier
+  faisait douze centimètres de surépaisseur, que la résolution de collisions
+  traitait comme un mur. Le joueur se cognait à un pont qu'il voyait déployé.
+  Mise de niveau avec le plancher, et un test verrouille l'alignement entre la
+  face visible et la boîte de collision — deux objets distincts que rien
+  n'obligeait à coïncider.
 - **Mécanismes jamais activés en jeu** (B-022) : `receptaclesActifs` cherchait le
   type du réceptacle sous le nom de son INSTANCE. Une chambre nomme ses
   mécanismes librement — « plaque_gauche » — et ce nom n'existe évidemment pas

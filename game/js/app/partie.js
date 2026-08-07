@@ -19,7 +19,7 @@ import { batir, departDe } from '../rendering/batisseur.js';
 import { soleil, ambiance } from '../rendering/kit.js';
 import {
   creerJoueur, regarder, avancer, basculerPrise, majObjets, occupations,
-  objetVise, terminalAPortee, HAUTEUR_YEUX,
+  objetVise, terminalAPortee, restaurerEgares, HAUTEUR_YEUX,
 } from './joueur.js';
 import { GABARIT_OBJET } from '../rendering/batisseur.js';
 import { PORTEE_SAISIE } from '../physics/portage.js';
@@ -58,7 +58,8 @@ export function demarrer(canvas, indexChambre = 0) {
   const camera = new THREE.PerspectiveCamera(
     72, (canvas.clientWidth || 1280) / (canvas.clientHeight || 720), 0.1, 200);
 
-  const joueur = creerJoueur(departDe(chambre));
+  const depart = departDe(chambre);
+  const joueur = creerJoueur(depart);
   const objets = [...bati.objets.values()];
 
   const intentions = {
@@ -200,6 +201,20 @@ export function demarrer(canvas, indexChambre = 0) {
 
     avancer(joueur, intentions, obstacles, dt);
     majObjets(joueur, objets, obstacles, dt);
+
+    const egares = restaurerEgares(joueur, objets, depart);
+    for (const nom of egares.rendus) {
+      const index = objets.findIndex((c) => c.invoque && c.nom === nom);
+      if (index >= 0) bati.groupe.remove(objets[index].maillage);
+      dematerialiser(etat.inventaire, nom);
+    }
+    if (egares.objets.length) {
+      etat.dernierMessage = `${egares.objets.join(', ')} remonté du gouffre.`;
+    } else if (egares.rendus.length) {
+      etat.dernierMessage = `${egares.rendus.join(', ')} rendu à l'inventaire.`;
+    } else if (egares.joueurTombe) {
+      etat.dernierMessage = 'Vous êtes tombé. Rien n\'est perdu.';
+    }
 
     etat.actifs = receptaclesActifs(occupations(joueur, objets, bati.receptacles));
     for (const [instance, recep] of bati.receptacles) {

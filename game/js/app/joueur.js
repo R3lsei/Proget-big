@@ -155,6 +155,65 @@ export function majObjets(joueur, objets, obstacles, dt) {
   }
 }
 
+/** Sous cette hauteur, on est tombé dans le gouffre et plus rien ne remonte. */
+export const SEUIL_CHUTE = -3;
+
+/**
+ * Ramène ce qui est tombé hors de la zone jouable.
+ *
+ * ─── Pourquoi restaurer plutôt que vérifier ──────────────────────────────────
+ * Un objet perdu au fond d'un gouffre peut rendre une salle insoluble, et le
+ * vérificateur ne peut pas le voir : il raisonne sur l'état INITIAL, pas sur ce
+ * que le joueur détruit en chemin. Prouver qu'aucune séquence d'actions n'est
+ * fatale serait coûteux et fragile ; supprimer la classe de problème ne coûte
+ * rien. C'est la solution de Portal, pour la même raison.
+ *
+ * Un objet invoqué depuis l'inventaire n'est pas restauré mais RENDU : il
+ * retourne à la collection et libère sa place. Le faire réapparaître au fond
+ * d'une salle qu'on a quittée serait incompréhensible.
+ *
+ * @returns {{objets: string[], joueurTombe: boolean, rendus: string[]}}
+ */
+export function restaurerEgares(joueur, objets, depart, seuil = SEUIL_CHUTE) {
+  const restaures = [];
+  const rendus = [];
+
+  for (let i = objets.length - 1; i >= 0; i--) {
+    const corps = objets[i];
+    if (corps.y > seuil) continue;
+    // Lâcher prise avant de restaurer : sinon le joueur remonterait en tenant un
+    // objet resté au fond, et la restauration le ferait surgir de nulle part
+    // dans ses mains.
+    if (corps === joueur.porte) joueur.porte = null;
+
+    if (corps.invoque) {
+      rendus.push(corps.nom);
+      objets.splice(i, 1);
+      continue;
+    }
+    if (!corps.origine) continue;
+    corps.x = corps.origine.x;
+    corps.y = corps.origine.y;
+    corps.z = corps.origine.z;
+    corps.vy = 0;
+    corps.auSol = true;
+    restaures.push(corps.nom);
+  }
+
+  let joueurTombe = false;
+  if (joueur.y <= seuil) {
+    // Le joueur ne perd rien en tombant : la chute est une erreur de parcours,
+    // pas une punition. Le sanctionner pousserait à jouer prudemment plutôt
+    // qu'à essayer, ce qui est exactement l'inverse de ce qu'on veut ici.
+    joueur.x = depart.x;
+    joueur.y = depart.y;
+    joueur.z = depart.z;
+    joueur.vy = 0;
+    joueurTombe = true;
+  }
+  return { objets: restaures, joueurTombe, rendus };
+}
+
 /**
  * Terminal à portée que l'objet tenu permet de déclencher, ou `null`.
  *
