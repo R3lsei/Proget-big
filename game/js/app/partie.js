@@ -23,6 +23,11 @@ import * as cocossd from '../perception/detecteurs/cocossd.js';
 import { batir, departDe, aFranchi } from '../rendering/batisseur.js';
 import { soleil, ambiance } from '../rendering/kit.js';
 import { creerComposeur, redimensionner } from '../rendering/posttraitement.js';
+import { semer } from '../rendering/semis.js';
+import { chargerEspece, planterSemis } from '../rendering/vegetation.js';
+import { SEMABLES } from '../rendering/semis.js';
+import { GLTFLoader } from '../../lib/GLTFLoader.js';
+import { DRACOLoader } from '../../lib/DRACOLoader.js';
 import {
   creerJoueur, regarder, avancer, basculerPrise, majObjets, occupations,
   objetVise, terminalAPortee, restaurerEgares, HAUTEUR_YEUX,
@@ -89,6 +94,55 @@ export function demarrer(canvas, indexChambre = 0) {
     dernierMessage: '',
   };
 
+  // ─── Végétation ───────────────────────────────────────────────────────────
+  //
+  // Les modèles se chargent une seule fois pour toute la partie, en arrière-plan.
+  // La chambre s'affiche AVANT eux : attendre huit cents kilo-octets de plantes
+  // pour montrer une pièce jouable ferait patienter le joueur devant un écran
+  // noir, alors que rien du jeu n'en dépend. La verdure apparaît quand elle est
+  // prête, et le décor procédural tient la place en attendant.
+  const especes = new Map();
+  let verdurePosee = null;
+
+  /** Sème et plante la verdure de la chambre en place. */
+  function verdir() {
+    if (!especes.size) return;
+    if (verdurePosee) {
+      verdurePosee.traverse((noeud) => noeud.geometry?.dispose?.());
+      verdurePosee.parent?.remove(verdurePosee);
+    }
+    // La graine dérive de l'identifiant de chambre : chaque salle a SON jardin,
+    // le même à chaque partie. Un décor qui change à chaque chargement rend
+    // tout défaut visuel irreproductible.
+    const graine = [...chambre.id].reduce((s, c) => s + c.charCodeAt(0), 0);
+    verdurePosee = planterSemis(semer(chambre, { depart, graine }), especes);
+    bati.groupe.add(verdurePosee);
+  }
+
+  etat.especesChargees = 0;
+  etat.verdureEnErreur = null;
+  (async () => {
+    const draco = new DRACOLoader().setDecoderPath('./lib/draco/');
+    const chargeur = new GLTFLoader().setDRACOLoader(draco);
+    // En parallèle, pas l'une après l'autre. Dix-neuf modèles chargés en série
+    // attendaient chacun le décodage Draco du précédent : deux espèces prêtes
+    // au bout de douze secondes, pour huit cents kilo-octets au total. Le
+    // navigateur sait mener plusieurs requêtes de front, et le décodage occupe
+    // ses ouvriers de fond ; le faire attendre ne servait personne.
+    await Promise.all(SEMABLES.map(async ({ espece }) => {
+      const charge = await chargerEspece(espece, chargeur, './');
+      if (charge) especes.set(espece, charge);
+      etat.especesChargees = especes.size;
+    }));
+    verdir();
+  })().catch((erreur) => {
+    // Une promesse rejetée sans `catch` disparaît sans un mot : la verdure ne
+    // s'affiche pas, le jeu tourne, et rien n'indique où chercher. On l'expose
+    // dans l'état, où le test de navigateur peut la lire.
+    etat.verdureEnErreur = String(erreur);
+    console.warn('Verdure indisponible :', erreur);
+  });
+
   /**
    * Charge une chambre, en remplaçant celle en place.
    *
@@ -116,6 +170,7 @@ export function demarrer(canvas, indexChambre = 0) {
     bati = batir(chambre);
     scene.add(bati.groupe);
     depart = departDe(chambre);
+    verdir();
     joueur = creerJoueur(depart);
     objets = [...bati.objets.values()];
 

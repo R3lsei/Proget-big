@@ -24,21 +24,17 @@ import {
   sol, mur, murPerce, porte, verriere, jardiniere, lierre, socleReceptacle, materiaux,
   borneTerminal, passerelle,
 } from './kit.js';
+import {
+  ORIENTATIONS, dallesDe, departDe, seuilDe, aFranchi, solPresent, solPorte,
+} from './plan.js';
 
-/**
- * Murs d'une chambre.
- *
- * `normale` pointe vers l'EXTÉRIEUR : c'est aussi la position du mur, en
- * proportion de la demi-dimension. Une seule convention pour placer le mur,
- * poser la porte et orienter le joueur — la première version en avait deux qui
- * se contredisaient, et le joueur démarrait le nez contre la sortie.
- */
-const ORIENTATIONS = Object.freeze({
-  nord: { rotation: 0, normale: [0, -1] },
-  est: { rotation: -Math.PI / 2, normale: [1, 0] },
-  sud: { rotation: Math.PI, normale: [0, 1] },
-  ouest: { rotation: Math.PI / 2, normale: [-1, 0] },
-});
+// La géométrie d'une chambre — orientations, dalles, seuil, départ — a été
+// sortie dans `plan.js` : le semis de végétation en a besoin lui aussi, et le
+// faire importer le bâtisseur aurait créé un cycle. Elle est réexportée ici
+// parce que le reste du jeu la demande historiquement au bâtisseur ; une
+// passerelle explicite vaut mieux qu'une migration de tous les appelants pour
+// un déplacement interne.
+export { departDe, seuilDe, aFranchi, dallesDe, solPresent, solPorte };
 
 /** Convertit une position en modules vers des mètres, centrée sur la chambre. */
 const enMetres = (modules) => modules * MODULE;
@@ -63,7 +59,7 @@ export function batir(chambre) {
 
   // Le sol est un collider comme les autres : sans lui, le joueur tombe
   // indéfiniment dès la première image, avant même d'avoir pu bouger.
-  for (const dalle of decouperSol(chambre)) {
+  for (const dalle of dallesDe(chambre)) {
     const piece = sol({ largeur: dalle.largeur, profondeur: dalle.profondeur, etat });
     piece.position.set(dalle.x, 0, dalle.z);
     groupe.add(piece);
@@ -179,64 +175,9 @@ export function batir(chambre) {
   };
 }
 
-/**
- * Découpe le sol en dalles, en laissant le gouffre vide.
- *
- * Sans cela, les zones d'une chambre ne seraient que des mots : le vérificateur
- * jurerait que la plate-forme n'est atteignable qu'une fois le pont sorti, et le
- * joueur y marcherait tranquillement sur un sol plein. C'est précisément la
- * divergence entre déclaration et géométrie que le fichier unique devait
- * empêcher — elle s'était réintroduite par le sol.
- *
- * Découpe en bandes plutôt qu'en trou percé : quatre rectangles restent des
- * boîtes, donc des colliders exacts. Une géométrie percée demanderait un maillage
- * de collision, pour un décor qui n'en a pas besoin.
- */
-function decouperSol(chambre) {
-  const { largeur, profondeur } = chambre.taille;
-  const gouffre = chambre.gouffre;
-  if (!gouffre) return [{ x: 0, z: 0, largeur, profondeur }];
-
-  const dalles = [];
-  const avant = gouffre.zMin + profondeur / 2;
-  const arriere = profondeur / 2 - gouffre.zMax;
-  if (avant > 0) {
-    dalles.push({
-      x: 0, z: enMetres((gouffre.zMin + -profondeur / 2) / 2),
-      largeur, profondeur: avant,
-    });
-  }
-  if (arriere > 0) {
-    dalles.push({
-      x: 0, z: enMetres((gouffre.zMax + profondeur / 2) / 2),
-      largeur, profondeur: arriere,
-    });
-  }
-  const gauche = gouffre.xMin + largeur / 2;
-  const droite = largeur / 2 - gouffre.xMax;
-  const profondeurGouffre = gouffre.zMax - gouffre.zMin;
-  if (gauche > 0) {
-    dalles.push({
-      x: enMetres((gouffre.xMin + -largeur / 2) / 2),
-      z: enMetres((gouffre.zMin + gouffre.zMax) / 2),
-      largeur: gauche, profondeur: profondeurGouffre,
-    });
-  }
-  if (droite > 0) {
-    dalles.push({
-      x: enMetres((gouffre.xMax + largeur / 2) / 2),
-      z: enMetres((gouffre.zMin + gouffre.zMax) / 2),
-      largeur: droite, profondeur: profondeurGouffre,
-    });
-  }
-  return dalles;
-}
-
 /** Gabarit d'un objet transportable : petit, cubique, franchissable en marchant. */
 export const GABARIT_OBJET = Object.freeze({ rayon: 0.16, hauteur: 0.32 });
 
-/** Marge latérale du seuil de sortie, en mètres : le rayon du joueur. */
-const MARGE_SEUIL = 0.35;
 
 /**
  * Matérialise les objets de la chambre à leurs poses déclarées.
@@ -307,64 +248,5 @@ function ajouterColliders(piece, colliders) {
   });
 }
 
-/**
- * Le seuil de sortie : le plan du mur percé, et la direction pour le franchir.
- *
- * Dérivé des MÊMES `ORIENTATIONS` que le mur et la porte. Recalculer ce seuil à
- * la main dans la boucle de jeu le laisserait dériver au premier changement de
- * convention cardinale — et le projet en a déjà connu deux qui se
- * contredisaient.
- */
-export function seuilDe(chambre) {
-  const murDeSortie = chambre.porte?.mur ?? 'nord';
-  const [nx, nz] = ORIENTATIONS[murDeSortie].normale;
-  const { largeur, profondeur } = chambre.taille;
-  const distance = ((murDeSortie === 'nord' || murDeSortie === 'sud')
-    ? enMetres(profondeur) : enMetres(largeur)) / 2;
-  return { nx, nz, distance, ouverture: enMetres(chambre.porte?.ouverture ?? 2) };
-}
 
-/**
- * Le joueur a-t-il franchi la porte ?
- *
- * On teste le plan du mur, pas une zone posée au-delà : il n'y a PAS de sol
- * derrière la porte, et le joueur commence à tomber dès le pas suivant. Le
- * franchissement doit donc être constaté au moment même où il passe.
- */
-export function aFranchi(position, chambre) {
-  const { nx, nz, distance, ouverture } = seuilDe(chambre);
-  const avance = position.x * nx + position.z * nz;
-  if (avance < distance) return false;
-  // Et par l'ouverture, pas à travers le mur : le long du mur, l'écart au centre
-  // doit tenir dans la largeur de la porte. La marge couvre le rayon du joueur,
-  // dont le centre reste en deçà du chambranle quand son corps le frôle.
-  const lateral = Math.abs(position.x * -nz + position.z * nx);
-  return lateral <= ouverture / 2 + MARGE_SEUIL;
-}
 
-/**
- * Position de départ du joueur : au centre, dos au mur de sortie.
- *
- * Calculée plutôt que déclarée. Une position écrite à la main dans chaque
- * chambre finit tôt ou tard à l'intérieur d'un mur après un redimensionnement —
- * c'est exactement le bogue B-001 qui a éjecté le joueur hors du décor.
- */
-export function departDe(chambre) {
-  const murDeSortie = chambre.porte?.mur ?? 'nord';
-  const [nx, nz] = ORIENTATIONS[murDeSortie].normale;
-  const { largeur, profondeur } = chambre.taille;
-  const recul = ((murDeSortie === 'nord' || murDeSortie === 'sud')
-    ? enMetres(profondeur) : enMetres(largeur)) / 2 - MODULE;
-
-  // Le joueur démarre au mur OPPOSÉ à la sortie et la regarde. Démarrer collé à
-  // la porte priverait la chambre de sa lecture : on doit voir où l'on va avant
-  // de chercher comment y aller.
-  return {
-    x: -nx * recul,
-    y: 0,
-    z: -nz * recul,
-    // La direction du regard vaut (-sin, -cos) chez le joueur ; on veut qu'elle
-    // égale la normale du mur de sortie.
-    yaw: Math.atan2(-nx, -nz),
-  };
-}

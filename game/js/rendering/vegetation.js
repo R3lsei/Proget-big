@@ -46,6 +46,150 @@ export const ESPECES = Object.freeze({
     attributionRequise: false,
     usage: 'soigne',
   },
+
+  // ─── Lot Stylized Nature (Quaternius) ─────────────────────────────────────
+  //
+  // CC0 1.0 : domaine public, aucune attribution exigée. C'est la meilleure
+  // licence possible pour un jeu qu'on veut publier — celle qui ne crée aucune
+  // dette. Les crédits restent écrits par correction, pas par obligation.
+  //
+  // Dix-neuf modèles retenus sur les soixante-huit du lot. Le reste est
+  // constitué d'arbres de plein champ de plusieurs mètres, sans emploi dans un
+  // complexe sous verrière à 3,6 m sous plafond. Tout importer parce que c'est
+  // gratuit n'aurait alourdi le jeu que de fichiers jamais vus.
+  herbe_courte: {
+    fichier: 'models/vegetation/herbe-courte.glb',
+    emprise: 0.74,
+    hauteur: 1.33,
+    attributionRequise: false,
+    usage: 'envahi',
+  },
+  herbe_haute: {
+    fichier: 'models/vegetation/herbe-haute.glb',
+    emprise: 0.99,
+    hauteur: 1.87,
+    attributionRequise: false,
+    usage: 'envahi',
+  },
+  herbe_fine_courte: {
+    fichier: 'models/vegetation/herbe-fine-courte.glb',
+    emprise: 1.32,
+    hauteur: 1.07,
+    attributionRequise: false,
+    usage: 'envahi',
+  },
+  herbe_fine_haute: {
+    fichier: 'models/vegetation/herbe-fine-haute.glb',
+    emprise: 1.59,
+    hauteur: 1.67,
+    attributionRequise: false,
+    usage: 'envahi',
+  },
+  trefle_1: {
+    fichier: 'models/vegetation/trefle-1.glb',
+    emprise: 0.8,
+    hauteur: 1.14,
+    attributionRequise: false,
+    usage: 'envahi',
+  },
+  trefle_2: {
+    fichier: 'models/vegetation/trefle-2.glb',
+    emprise: 0.85,
+    hauteur: 1.26,
+    attributionRequise: false,
+    usage: 'envahi',
+  },
+  fougere: {
+    fichier: 'models/vegetation/fougere.glb',
+    emprise: 9.05,
+    hauteur: 2.69,
+    attributionRequise: false,
+    usage: 'envahi',
+  },
+  plante_1: {
+    fichier: 'models/vegetation/plante-1.glb',
+    emprise: 1.39,
+    hauteur: 1.01,
+    attributionRequise: false,
+    usage: 'envahi',
+  },
+  plante_1_grande: {
+    fichier: 'models/vegetation/plante-1-grande.glb',
+    emprise: 3.13,
+    hauteur: 3.76,
+    attributionRequise: false,
+    usage: 'envahi',
+  },
+  plante_7: {
+    fichier: 'models/vegetation/plante-7.glb',
+    emprise: 1.05,
+    hauteur: 0.33,
+    attributionRequise: false,
+    usage: 'envahi',
+  },
+  plante_7_grande: {
+    fichier: 'models/vegetation/plante-7-grande.glb',
+    emprise: 1.36,
+    hauteur: 0.3,
+    attributionRequise: false,
+    usage: 'envahi',
+  },
+  buisson: {
+    fichier: 'models/vegetation/buisson.glb',
+    emprise: 1.97,
+    hauteur: 1.58,
+    attributionRequise: false,
+    usage: 'envahi',
+  },
+  buisson_fleuri: {
+    fichier: 'models/vegetation/buisson-fleuri.glb',
+    emprise: 1.97,
+    hauteur: 1.58,
+    attributionRequise: false,
+    usage: 'envahi',
+  },
+  champignon: {
+    fichier: 'models/vegetation/champignon.glb',
+    emprise: 0.78,
+    hauteur: 0.46,
+    attributionRequise: false,
+    usage: 'envahi',
+  },
+  fleurs_3: {
+    fichier: 'models/vegetation/fleurs-3.glb',
+    emprise: 1.59,
+    hauteur: 2.05,
+    attributionRequise: false,
+    usage: 'envahi',
+  },
+  fleurs_4: {
+    fichier: 'models/vegetation/fleurs-4.glb',
+    emprise: 1.78,
+    hauteur: 2.49,
+    attributionRequise: false,
+    usage: 'envahi',
+  },
+  caillou_1: {
+    fichier: 'models/vegetation/caillou-1.glb',
+    emprise: 0.5,
+    hauteur: 0.1,
+    attributionRequise: false,
+    usage: 'envahi',
+  },
+  caillou_2: {
+    fichier: 'models/vegetation/caillou-2.glb',
+    emprise: 0.48,
+    hauteur: 0.1,
+    attributionRequise: false,
+    usage: 'envahi',
+  },
+  rocher: {
+    fichier: 'models/vegetation/rocher.glb',
+    emprise: 3.23,
+    hauteur: 2.26,
+    attributionRequise: false,
+    usage: 'envahi',
+  },
 });
 
 const chargees = new Map();
@@ -150,6 +294,66 @@ export function massif(espece, {
     }
     instances.instanceMatrix.needsUpdate = true;
     groupe.add(instances);
+  }
+  return groupe;
+}
+
+/**
+ * Plante un semis : une InstancedMesh par espèce, quel qu'en soit le nombre.
+ *
+ * Le semis vient de `semis.js`, qui a déjà répondu à la seule question qui
+ * compte — où est-ce qu'une plante a le droit de pousser. Ici on ne décide plus
+ * rien, on matérialise : mélanger placement et rendu remettrait la contrainte
+ * de sol dans un module que l'on ne peut pas tester sans WebGL.
+ *
+ * @param {{espece:string,x:number,z:number,rotation:number,echelle:number}[]} semis
+ * @param {Map<string, object>} especes  espèces chargées, par nom
+ * @returns {THREE.Group}
+ */
+export function planterSemis(semis, especes) {
+  const groupe = new THREE.Group();
+  groupe.name = 'verdure';
+
+  // Regroupement par espèce : cinquante plantes de six espèces coûtent six
+  // appels de dessin, pas cinquante. C'est la différence entre une salle
+  // verdoyante à 120 images par seconde et la même à 30.
+  const parEspece = new Map();
+  for (const pousse of semis) {
+    if (!parEspece.has(pousse.espece)) parEspece.set(pousse.espece, []);
+    parEspece.get(pousse.espece).push(pousse);
+  }
+
+  for (const [nom, pousses] of parEspece) {
+    const espece = especes.get(nom);
+    // Un modèle absent dégrade le décor, il n'interrompt pas la partie : on
+    // saute l'espèce. Le jeu reste jouable avec moins de verdure, ce qui vaut
+    // infiniment mieux qu'un écran noir.
+    if (!espece) continue;
+
+    const poses = pousses.map((p) => {
+      // `echelle` arrive déjà mise à l'échelle du jeu : c'est `semis.js` qui a
+      // calculé le facteur, parce que c'est lui qui a réservé la place au sol.
+      // Le recalculer ici ferait diverger l'espace réservé et l'espace occupé.
+      const facteur = p.echelle;
+      return new THREE.Matrix4().compose(
+        new THREE.Vector3(p.x, 0, p.z),
+        // Rotation autour de la verticale seulement : une plante couchée sur le
+        // flanc trahit immédiatement la répétition.
+        new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), p.rotation),
+        new THREE.Vector3(facteur, facteur, facteur));
+    });
+
+    for (const partie of espece.parties) {
+      const instances = new THREE.InstancedMesh(
+        partie.geometrie, partie.materiau, poses.length);
+      instances.castShadow = true;
+      instances.receiveShadow = true;
+      for (let i = 0; i < poses.length; i++) {
+        instances.setMatrixAt(i, poses[i].clone().multiply(partie.locale));
+      }
+      instances.instanceMatrix.needsUpdate = true;
+      groupe.add(instances);
+    }
   }
   return groupe;
 }

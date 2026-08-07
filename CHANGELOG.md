@@ -6,6 +6,37 @@ Versionnement [SemVer](https://semver.org/lang/fr/).
 ## [Non publié]
 
 ### Ajouté
+- **Vraie végétation, dix-neuf espèces** (T-036) : lot *Stylized Nature* de
+  Quaternius, en **CC0 1.0** — domaine public, aucune attribution exigée, donc
+  aucune dette avant publication. Dix-neuf modèles retenus sur soixante-huit :
+  le reste est constitué d'arbres de plein champ de plusieurs mètres, sans
+  emploi sous une verrière à 3,6 m. Recompressés en Draco + WebP 512 px, les
+  dix-neuf pèsent **0,8 Mo**. `tools/preparer-vegetation.mjs` rejoue la chaîne
+  et porte la liste des choix — la première préparation avait été faite à la
+  main, et six semaines plus tard il n'en restait rien.
+- **Semis sous contrainte** (T-036) : la végétation n'est plus posée, elle est
+  SEMÉE. Une fonction pure décide où chaque plante a le droit de pousser, et le
+  résultat est une liste de positions, pas des maillages — c'est ce qui rend la
+  règle testable sans WebGL. Une plante ne peut pas pousser sans sol sous toute
+  son emprise, dans un mur, sur un mécanisme, sur un objet posé, dans le passage
+  de la porte, au point de réveil du joueur, ni à travers une autre plante.
+  16 tests ; mutation, 9 sur 9 après réécriture de deux tests non discriminants.
+
+### Corrigé
+- **De l'herbe poussait dans le vide** (B-031) : signalé par le joueur. Le lierre
+  de la serre était déclaré sur toute la profondeur de la pièce, et cette pièce a
+  un gouffre : des touffes flottaient au-dessus de trois mètres de rien.
+  Ce n'était pas une coordonnée mal tapée. Le décor était posé sans qu'on lui
+  demande jamais s'il y avait du sol dessous — la question n'existait nulle part
+  dans le code. Corriger la coordonnée aurait effacé le symptôme et laissé la
+  classe ouverte pour la salle suivante. La géométrie de chambre a été sortie
+  dans `plan.js`, où le bâtisseur et le semis lisent LES MÊMES dalles.
+- **Des fleurs plus larges qu'une plaque de pression** (B-032) : les modèles sont
+  modelés pour le plein air, et les ramener à la taille voulue par la seule
+  HAUTEUR explosait leur largeur — `plante_7_grande` mesure 0,30 m de haut pour
+  1,36 m de large, si bien que la viser à 1,10 m la gonflait 3,7 fois. L'échelle
+  retient désormais le plus petit des deux facteurs, et le rayon qui réserve la
+  place au sol est dérivé de l'emprise mesurée au lieu d'être écrit à l'estime.
 - **Chaîne d'image : floraison, étalonnage, vignettage** (T-032) : le décor était
   géométriquement juste et visuellement mort — des aplats de couleur, aucune
   profondeur. Le réflexe est d'aller chercher des modèles 3D plus détaillés ;
