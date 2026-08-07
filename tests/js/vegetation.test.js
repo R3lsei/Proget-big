@@ -33,9 +33,17 @@ const maillages = (o) => { const t = []; o.traverse((n) => n.isMesh && t.push(n)
 
 // ─── Catalogue d'espèces ────────────────────────────────────────────────────
 
-test('chaque espèce déclare un fichier, une hauteur et sa licence', () => {
+test('chaque espèce déclare son origine, une hauteur et sa licence', () => {
+  // Une espèce PROCÉDURALE n'a pas de fichier : elle est produite par le code.
+  // Elle doit néanmoins déclarer tout le reste — la mousse est de la végétation
+  // comme les autres, et le jour où elle viendrait d'un modèle importé, rien
+  // dans le semis ne devrait changer.
   for (const [nom, espece] of Object.entries(ESPECES)) {
-    assert.match(espece.fichier, /^models\/vegetation\/.+\.glb$/, `${nom} : chemin douteux`);
+    if (espece.procedurale) {
+      assert.equal(espece.fichier, undefined, `${nom} : procédurale ET avec un fichier`);
+    } else {
+      assert.match(espece.fichier, /^models\/vegetation\/.+\.glb$/, `${nom} : chemin douteux`);
+    }
     assert.ok(espece.hauteur > 0 && espece.hauteur < 5, `${nom} : hauteur invraisemblable`);
     assert.equal(typeof espece.attributionRequise, 'boolean', `${nom} : licence non déclarée`);
   }
@@ -55,6 +63,7 @@ test('toute espèce à attribution figure dans le fichier de crédits', () => {
 
 test('les modèles annoncés existent réellement', () => {
   for (const [nom, espece] of Object.entries(ESPECES)) {
+    if (espece.procedurale) continue;
     assert.doesNotThrow(() => readFileSync('game/' + espece.fichier),
       `${nom} : ${espece.fichier} introuvable`);
   }

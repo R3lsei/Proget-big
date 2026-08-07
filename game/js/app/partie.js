@@ -21,7 +21,8 @@ import {
 } from '../perception/detecteur.js';
 import * as cocossd from '../perception/detecteurs/cocossd.js';
 import { batir, departDe, aFranchi } from '../rendering/batisseur.js';
-import { soleil, ambiance } from '../rendering/kit.js';
+import { ambiance } from '../rendering/kit.js';
+import { dehors, soleilDeTempete, cieletSable } from '../rendering/dehors.js';
 import { creerComposeur, redimensionner } from '../rendering/posttraitement.js';
 import { semer } from '../rendering/semis.js';
 import { chargerEspece, planterSemis } from '../rendering/vegetation.js';
@@ -55,11 +56,18 @@ export function demarrer(canvas, indexChambre = 0) {
   renderer.toneMappingExposure = 1.0;
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0xc9d8de);
   scene.environment = new THREE.PMREMGenerator(renderer)
     .fromScene(new RoomEnvironment(), 0.04).texture;
 
-  scene.add(soleil({ portee: 26 }));
+  // Le désert et sa tempête. Ajoutés à la scène plutôt qu'en fond : une couleur
+  // de fond n'a pas d'horizon, donc pas d'échelle, et le dehors se lirait comme
+  // un aplat peint sur la vitre au lieu d'un lieu où l'on pourrait aller.
+  const exterieur = dehors();
+  scene.add(exterieur.groupe);
+  scene.fog = exterieur.brume;
+
+  scene.add(soleilDeTempete({ portee: 26 }));
+  scene.add(cieletSable());
   scene.add(ambiance());
 
   const camera = new THREE.PerspectiveCamera(
@@ -491,6 +499,10 @@ export function demarrer(canvas, indexChambre = 0) {
     // On rend par le composeur, jamais par le renderer : `renderer.render`
     // afficherait la scène brute et court-circuiterait toute la chaîne, sans
     // erreur ni avertissement. L'image serait simplement fade.
+    // Le ciel avance avec l'horloge du navigateur, pas avec le pas de
+    // simulation : la tempête n'est pas du jeu, elle est de l'ambiance, et rien
+    // du gameplay ne doit en dépendre.
+    exterieur.animer(maintenant / 1000);
     image.composeur.render();
     requestAnimationFrame(boucle);
   }

@@ -51,8 +51,31 @@ test('un mur repose sur le sol, jamais enfoncé ni flottant', () => {
 });
 
 test('le sol est sous le niveau zéro, pour que rien ne s\'y enfonce', () => {
+  // Le carrelage poli affleure à un millimètre au-dessus du fond de joint :
+  // sans ce décalage les deux surfaces se disputent le même pixel et
+  // scintillent. La tolérance couvre ce millimètre, et rien de plus — un
+  // carrelage qui dépasserait vraiment ferait trébucher le joueur sur du plat.
   const boite = new THREE.Box3().setFromObject(sol({ largeur: 4, profondeur: 4 }));
-  assert.ok(boite.max.y <= 1e-9, `surface à ${boite.max.y}`);
+  assert.ok(boite.max.y <= 0.012, `surface à ${boite.max.y}`);
+});
+
+test('le carrelage est instancié, pas répété maillage par maillage', () => {
+  // Un sol de 8 × 8 modules fait plus de deux cent cinquante carreaux. Autant
+  // de maillages coûteraient à eux seuls plus d'appels de dessin que toute la
+  // salle réunie.
+  const pieces = maillages(sol({ largeur: 8, profondeur: 8, etat: 'soigne' }));
+  assert.ok(pieces.some((p) => p.isInstancedMesh), 'le carrelage devrait être instancié');
+  assert.ok(pieces.length < 12, `${pieces.length} maillages pour un sol : trop`);
+});
+
+test('une zone envahie a perdu son carrelage', () => {
+  // L'état du lieu doit se lire au sol autant qu'aux murs : le béton nu ne
+  // renvoie rien, le carrelage poli renvoie la tempête.
+  const soigne = maillages(sol({ largeur: 4, profondeur: 4, etat: 'soigne' }));
+  const envahi = maillages(sol({ largeur: 4, profondeur: 4, etat: 'envahi' }));
+  assert.ok(soigne.length > envahi.length, 'le sol soigné devrait porter des carreaux');
+  assert.ok(soigne.some((p) => p.material.roughness < 0.3),
+    'aucune surface polie : le sol ne renverra rien');
 });
 
 // ─── Matériaux partagés ─────────────────────────────────────────────────────
@@ -85,10 +108,16 @@ test('tout le kit puise dans la palette, sans matériau improvisé', () => {
   }
 });
 
-test('la palette tient en trois familles', () => {
-  // ART_DIRECTION §5 : panneau, structure, vivant. Une palette qui enfle est le
-  // premier symptôme d'une direction artistique qui se dilue.
-  assert.ok(Object.keys(materiaux()).length <= 12,
+test('la palette tient en quatre familles', () => {
+  // ART_DIRECTION §5 : panneau, structure, vivant — et désormais VERRIÈRE, qui
+  // a gagné son rang le jour où le dehors est devenu un personnage. Le verre
+  // orangé, l'ossature claire et le carrelage poli forment la frontière entre
+  // le laboratoire et la tempête : c'est le sujet de l'image, pas un détail.
+  //
+  // Le plafond reste bas et volontaire. Une palette qui enfle est le premier
+  // symptôme d'une direction artistique qui se dilue, et chaque matière ajoutée
+  // doit désormais déloger une famille entière, pas se glisser dans la liste.
+  assert.ok(Object.keys(materiaux()).length <= 15,
     `${Object.keys(materiaux()).length} matériaux : la palette se disperse`);
 });
 
@@ -167,7 +196,9 @@ test('les deux états produisent des matières différentes', () => {
   const propre = maillages(mur({ largeur: 2, etat: 'soigne' }))[0].material;
   const use = maillages(mur({ largeur: 2, etat: 'envahi' }))[0].material;
   assert.notStrictEqual(propre, use);
-  assert.notEqual(sol({ etat: 'soigne' }).material, sol({ etat: 'envahi' }).material);
+  assert.notStrictEqual(
+    maillages(sol({ etat: 'soigne' }))[0].material,
+    maillages(sol({ etat: 'envahi' }))[0].material);
 });
 
 test('chaque état déclaré est constructible', () => {
@@ -214,6 +245,6 @@ test('les pièces projettent et reçoivent les ombres', () => {
   // Le défaut le plus visible de la version précédente : les objets semblaient
   // collés au sol plutôt que posés dessus.
   assert.ok(maillages(mur({ largeur: 2 })).some((m) => m.castShadow));
-  assert.equal(sol({}).receiveShadow, true);
+  assert.ok(maillages(sol({})).some((p) => p.receiveShadow));
   assert.ok(maillages(touffe({})).every((p) => p.castShadow));
 });

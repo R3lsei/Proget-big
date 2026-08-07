@@ -21,7 +21,7 @@ import { depuisBox3, depuisCentre } from '../physics/aabb.js';
 import { chercher } from '../perception/base/index.js';
 import {
   MODULE, HAUTEUR_CHAMBRE,
-  sol, mur, murPerce, porte, verriere, jardiniere, lierre, socleReceptacle, materiaux,
+  sol, mur, murPerce, porte, verriere, verriereArc, jardiniere, lierre, socleReceptacle, materiaux,
   borneTerminal, passerelle,
 } from './kit.js';
 import {
@@ -69,24 +69,71 @@ export function batir(chambre) {
   }
 
   const murDeSortie = chambre.porte?.mur ?? 'nord';
+  // Le mur vitré : une verrière en arc à la place d'une cloison. Déclaré par la
+  // chambre, jamais deviné — c'est une décision de mise en scène, et deux
+  // salles voisines n'ouvrent pas forcément sur le même côté.
+  const murVitre = chambre.verriere ?? null;
+  const RAYON_ARC = enMetres(HAUTEUR_CHAMBRE);
+
   for (const [orientation, { rotation }] of Object.entries(ORIENTATIONS)) {
     const longueur = (orientation === 'nord' || orientation === 'sud') ? largeur : profondeur;
     const recul = ((orientation === 'nord' || orientation === 'sud')
       ? enMetres(profondeur) : enMetres(largeur)) / 2;
+    const [nx, nz] = ORIENTATIONS[orientation].normale;
+
+    if (orientation === murVitre) {
+      const arc = verriereArc({ largeur: longueur, rayon: RAYON_ARC });
+      // L'arc part du plan du mur au niveau du sol et se referme vers le
+      // centre : son origine est donc en retrait d'un rayon.
+      arc.position.set(nx * (recul - RAYON_ARC), 0, nz * (recul - RAYON_ARC));
+      // PAS la rotation de la table des murs : celle-ci oriente un panneau
+      // PLAT, dont la face regarde le dehors. L'arc, lui, doit voir son
+      // ouverture — sa direction à l'angle zéro — alignée sur la normale
+      // sortante. Réutiliser la rotation des murs envoyait la verrière du côté
+      // OPPOSÉ de la pièce, à travers le sol.
+      arc.rotation.y = Math.atan2(nx, nz);
+      groupe.add(arc);
+
+      // Le collider n'est pas au plan du mur mais en retrait : à hauteur d'œil,
+      // le vitrage a déjà commencé à se courber vers l'intérieur. Le poser au
+      // plan du mur laisserait la tête du joueur traverser le verre.
+      const yeux = 1.7;
+      const retrait = RAYON_ARC - Math.sqrt(Math.max(0, RAYON_ARC ** 2 - yeux ** 2));
+      const epaisseur = 0.3;
+      const large = enMetres(longueur);
+      colliders.push(depuisCentre(
+        nx * (recul - retrait - epaisseur / 2), enMetres(HAUTEUR_CHAMBRE) / 2,
+        nz * (recul - retrait - epaisseur / 2),
+        nx !== 0 ? epaisseur : large, enMetres(HAUTEUR_CHAMBRE),
+        nx !== 0 ? large : epaisseur));
+      continue;
+    }
 
     const cloison = orientation === murDeSortie
       ? murPerce({ largeur: longueur, etat, ouverture: chambre.porte?.ouverture ?? 2 })
       : mur({ largeur: longueur, etat });
 
-    const [nx, nz] = ORIENTATIONS[orientation].normale;
     cloison.position.set(nx * recul, 0, nz * recul);
     cloison.rotation.y = rotation;
     groupe.add(cloison);
     ajouterColliders(cloison, colliders);
   }
 
-  const toit = verriere({ largeur, profondeur });
+  // Toiture plate sur ce que l'arc ne couvre pas. La laisser pleine ferait
+  // deux plafonds superposés du côté vitré, et le verre de l'un rendrait
+  // opaque le verre de l'autre.
+  const surZ = murVitre === 'nord' || murVitre === 'sud';
+  const retraitToit = murVitre ? RAYON_ARC / MODULE : 0;
+  const toit = verriere({
+    largeur: surZ ? largeur : largeur - retraitToit,
+    profondeur: surZ ? profondeur - retraitToit : profondeur,
+  });
   toit.position.y = enMetres(HAUTEUR_CHAMBRE);
+  if (murVitre) {
+    const [vx, vz] = ORIENTATIONS[murVitre].normale;
+    toit.position.x = -vx * (RAYON_ARC / 2);
+    toit.position.z = -vz * (RAYON_ARC / 2);
+  }
   groupe.add(toit);
 
   // Porte, posée dans l'ouverture du mur de sortie.

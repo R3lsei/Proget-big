@@ -53,10 +53,37 @@ function creerMateriaux() {
       color: 0x2f3538, roughness: 0.45, metalness: 0.85, envMapIntensity: 0.6,
     }),
     sol_carrelage: panneau(0xc3ccce, 0.45),
+    // Ossature de verrière : CLAIRE, comme celle de toute serre réelle. En métal
+    // sombre, les meneaux vus en enfilade — c'est-à-dire dès qu'on lève les yeux
+    // — fusionnaient en une masse noire qui bouchait le ciel. Le défaut ne
+    // venait d'aucun réglage de lumière : une résille sombre vue par la tranche
+    // est un mur, quelle que soit la scène derrière.
+    ossature: new THREE.MeshStandardMaterial({
+      color: 0xd8dedf, roughness: 0.4, metalness: 0.3, envMapIntensity: 0.9,
+    }),
     sol_beton: panneau(0x8f8b81, 0.95),
+    // Verre ORANGÉ : c'est lui la frontière du jeu. Dehors la tempête, dedans le
+    // laboratoire — et la seule chose qui sépare les deux est cette teinte. Un
+    // verre neutre laisserait le désert entrer tel quel dans l'image et il n'y
+    // aurait plus de dedans du tout.
     verre: new THREE.MeshStandardMaterial({
-      color: 0xdff0f4, roughness: 0.05, metalness: 0, transparent: true,
-      opacity: 0.22, envMapIntensity: 1.2,
+      color: 0xe89a52, roughness: 0.08, metalness: 0, transparent: true,
+      opacity: 0.16, envMapIntensity: 1.2, side: THREE.DoubleSide,
+      // Le verre ne s'éteint jamais complètement. Sa sous-face ne reçoit aucune
+      // lumière directe — le soleil est au-dessus — et une vitre parfaitement
+      // noire par en dessous n'existe pas : une vraie vitre diffuse dans son
+      // épaisseur. Sans ce minimum, la toiture formait une masse sombre au
+      // milieu du ciel, et c'était bien le verre, pas une géométrie parasite.
+      emissive: 0xe89a52, emissiveIntensity: 0.18,
+    }),
+    // Carrelage du laboratoire : peu rugueux, donc il REND l'environnement.
+    // C'est ce reflet qui fait entrer l'orange du dehors sur le sol blanc, et
+    // qui lie les deux moitiés de l'image sans rien peindre.
+    sol_poli: new THREE.MeshStandardMaterial({
+      color: 0xe9edee, roughness: 0.14, metalness: 0.05, envMapIntensity: 1.6,
+    }),
+    joint_sol: new THREE.MeshStandardMaterial({
+      color: 0xaeb6b8, roughness: 0.5, metalness: 0.05, envMapIntensity: 0.8,
     }),
     // Découpe binaire, jamais de fondu : le fondu impose un tri par profondeur
     // et interdit la fusion. Voir ART_DIRECTION §6.
@@ -157,16 +184,60 @@ export function mur({ largeur = 4, hauteur = HAUTEUR_CHAMBRE, etat = 'soigne' } 
   return groupe;
 }
 
-/** Dalle de sol, carrelage clair au cœur, béton dans les zones abandonnées. */
+/**
+ * Sol carrelé, poli, à joints creux.
+ *
+ * Le sol n'était qu'une dalle d'une seule couleur mate. Or c'est la plus grande
+ * surface visible du jeu : tant qu'elle ne renvoie rien, la salle reste une
+ * maquette quelle que soit la qualité du reste. Poli, il rend l'environnement —
+ * et fait donc entrer l'orange de la tempête sur le blanc du laboratoire, ce
+ * qui lie les deux moitiés de l'image sans qu'on ait rien à peindre.
+ *
+ * Le carrelage est fait de vraies dalles séparées par des creux, comme les
+ * murs. Une texture de damier aurait été moins chère, mais un joint creux
+ * accroche la lumière rasante des verrières : c'est en relief qu'il donne
+ * l'échelle, pas en dessin.
+ */
 export function sol({ largeur = 4, profondeur = 4, etat = 'soigne' } = {}) {
   const m = materiaux();
-  const dalle = new THREE.Mesh(
+  const groupe = new THREE.Group();
+  groupe.name = `sol_${largeur}x${profondeur}_${etat}`;
+
+  // Fond de joint : c'est lui qu'on aperçoit entre les carreaux.
+  const fond = new THREE.Mesh(
     new THREE.BoxGeometry(largeur * MODULE, EPAISSEUR, profondeur * MODULE),
-    etat === 'envahi' ? m.sol_beton : m.sol_carrelage);
-  dalle.position.y = -EPAISSEUR / 2;
-  dalle.receiveShadow = true;
-  dalle.name = `sol_${largeur}x${profondeur}_${etat}`;
-  return dalle;
+    etat === 'envahi' ? m.sol_beton : m.joint_sol);
+  fond.position.y = -EPAISSEUR / 2;
+  fond.receiveShadow = true;
+  groupe.add(fond);
+
+  // Une zone envahie a perdu son carrelage : béton nu, sans reflet. L'état du
+  // lieu doit se lire au sol autant qu'aux murs.
+  if (etat === 'envahi') return groupe;
+
+  // Les carreaux ne sont pas alignés sur la grille des modules : deux carreaux
+  // par module. Un carreau de 1,2 m se lirait comme une dalle de béton, pas
+  // comme du carrelage de laboratoire.
+  const pas = MODULE / 2;
+  const carreau = new THREE.BoxGeometry(pas - JOINT * 2, 0.02, pas - JOINT * 2);
+  const colonnes = Math.round(largeur * 2);
+  const rangees = Math.round(profondeur * 2);
+  const carrelage = new THREE.InstancedMesh(carreau, m.sol_poli, colonnes * rangees);
+  carrelage.receiveShadow = true;
+
+  const pose = new THREE.Object3D();
+  let index = 0;
+  for (let c = 0; c < colonnes; c++) {
+    for (let r = 0; r < rangees; r++) {
+      pose.position.set(
+        (c - (colonnes - 1) / 2) * pas, 0.001, (r - (rangees - 1) / 2) * pas);
+      pose.updateMatrix();
+      carrelage.setMatrixAt(index++, pose.matrix);
+    }
+  }
+  carrelage.instanceMatrix.needsUpdate = true;
+  groupe.add(carrelage);
+  return groupe;
 }
 
 /**
@@ -181,20 +252,136 @@ export function verriere({ largeur = 4, profondeur = 4 } = {}) {
   groupe.name = `verriere_${largeur}x${profondeur}`;
   const m = materiaux();
 
+  // Une NAPPE, pas une boîte. Une boîte de verre présente deux surfaces à
+  // traverser : le ciel était teinté deux fois et s'assombrissait d'autant.
+  // Une vitre de toiture se regarde par en dessous, jamais par la tranche.
   const vitrage = new THREE.Mesh(
-    new THREE.BoxGeometry(largeur * MODULE, 0.04, profondeur * MODULE), m.verre);
+    new THREE.PlaneGeometry(largeur * MODULE, profondeur * MODULE), m.verre);
+  vitrage.rotation.x = -Math.PI / 2;
   groupe.add(vitrage);
 
   // Les meneaux découpent la lumière : c'est ce quadrillage projeté au sol qui
   // donne au lieu sa profondeur, bien plus qu'une texture de mur.
-  const geometrieMeneau = new THREE.BoxGeometry(0.08, 0.12, profondeur * MODULE);
+  const geometrieMeneau = new THREE.BoxGeometry(0.07, 0.09, profondeur * MODULE);
   for (let i = 0; i <= largeur; i++) {
-    const meneau = new THREE.Mesh(geometrieMeneau, m.structure);
+    const meneau = new THREE.Mesh(geometrieMeneau, m.ossature);
     meneau.position.x = (i - largeur / 2) * MODULE;
     meneau.castShadow = true;
     groupe.add(meneau);
   }
   return groupe;
+}
+
+/**
+ * Verrière en arc : le côté vitré de la serre.
+ *
+ * Un quart de cylindre qui part du sol, se redresse et rejoint la toiture. La
+ * salle cessait d'être une boîte au moment précis où l'on ajoutait cette
+ * courbe : quatre murs droits et un plafond plat se lisent comme un couloir,
+ * quel que soit le soin porté aux matières. Une paroi courbe dit « serre »
+ * avant qu'on ait nommé quoi que ce soit.
+ *
+ * Facettée, et non lisse. D'abord parce que c'est ainsi que se construit une
+ * vraie verrière — des panneaux plats sur une ossature cintrée. Ensuite parce
+ * que chaque facette prend la lumière sous un angle légèrement différent : la
+ * courbe se lit alors dans le dégradé des reflets, ce qu'une surface lisse à ce
+ * niveau de détail ne donnerait pas.
+ *
+ * @param {object} options
+ * @param {number} options.largeur   étendue le long du mur, en modules
+ * @param {number} options.rayon     rayon de l'arc, en mètres
+ * @param {number} options.segments  nombre de facettes sur le quart de tour
+ */
+export function verriereArc({ largeur = 8, rayon = HAUTEUR_CHAMBRE * MODULE, segments = 10 } = {}) {
+  const groupe = new THREE.Group();
+  groupe.name = `verriere_arc_${largeur}`;
+  const m = materiaux();
+
+  const longueur = largeur * MODULE;
+  const pas = (Math.PI / 2) / segments;
+  // Corde d'une facette : la largeur réelle du panneau plat qui sous-tend
+  // l'angle. La calculer évite les fentes entre panneaux, qu'une largeur
+  // approchée laisserait apparaître comme des rais de lumière.
+  const corde = 2 * rayon * Math.sin(pas / 2);
+
+  const panneau = new THREE.BoxGeometry(longueur, corde, 0.04);
+  const vitrage = new THREE.InstancedMesh(panneau, m.verre, segments);
+  const meneauArc = new THREE.BoxGeometry(longueur, 0.045, 0.10);
+  const meneaux = new THREE.InstancedMesh(meneauArc, m.ossature, segments + 1);
+  meneaux.castShadow = true;
+
+  const pose = new THREE.Object3D();
+  for (let i = 0; i < segments; i++) {
+    const angle = (i + 0.5) * pas;
+    pose.position.set(0, rayon * Math.sin(angle), rayon * Math.cos(angle));
+    pose.rotation.set(-angle, 0, 0);
+    pose.updateMatrix();
+    vitrage.setMatrixAt(i, pose.matrix);
+  }
+  for (let i = 0; i <= segments; i++) {
+    const angle = i * pas;
+    pose.position.set(0, rayon * Math.sin(angle), rayon * Math.cos(angle));
+    pose.rotation.set(-angle, 0, 0);
+    pose.updateMatrix();
+    meneaux.setMatrixAt(i, pose.matrix);
+  }
+  vitrage.instanceMatrix.needsUpdate = true;
+  meneaux.instanceMatrix.needsUpdate = true;
+  groupe.add(vitrage, meneaux);
+
+  // Montants verticaux, un par module : ils découpent la lumière sur toute la
+  // hauteur de l'arc, et c'est ce quadrillage projeté au sol qui donne au lieu
+  // sa profondeur — bien plus qu'une texture de mur.
+  const points = [];
+  for (let i = 0; i <= segments; i++) {
+    points.push(new THREE.Vector3(0, rayon * Math.sin(i * pas), rayon * Math.cos(i * pas)));
+  }
+  const nervure = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points), segments * 2, 0.022, 5, false);
+  // Un montant tous les deux modules : à chaque module, l'ossature masquait le
+  // dehors qu'elle est censée encadrer.
+  for (let c = 0; c <= largeur; c += 2) {
+    const montant = new THREE.Mesh(nervure, m.ossature);
+    montant.position.x = (c - largeur / 2) * MODULE;
+    montant.castShadow = true;
+    groupe.add(montant);
+  }
+  return groupe;
+}
+
+/**
+ * Plaque de mousse : la première chose qui repousse dans un lieu abandonné.
+ *
+ * Le lot de modèles n'en contient pas, et c'est la seule espèce qui manquait
+ * vraiment. La mousse ne se dresse pas, elle ÉPOUSE — un modèle importé aurait
+ * de toute façon dû être aplati jusqu'à n'être plus qu'une tache. Autant la
+ * produire directement, d'autant qu'une tache irrégulière est exactement ce
+ * qu'un polygone à rayon variable sait faire.
+ *
+ * Renvoie une géométrie, pas un maillage : elle rejoint le catalogue des
+ * espèces et se plante par instanciation comme les modèles chargés.
+ */
+export function geometrieMousse({ rayon = 0.45, cotes = 11, graine = 1 } = {}) {
+  let etat = (graine * 2654435761) >>> 0;
+  const suivant = () => {
+    etat = (etat * 1664525 + 1013904223) >>> 0;
+    return etat / 4294967296;
+  };
+
+  const sommets = [0, 0, 0];
+  const index = [];
+  // Rayon irrégulier : un disque parfait se lit comme une pastille collée.
+  for (let i = 0; i < cotes; i++) {
+    const angle = (i / cotes) * Math.PI * 2;
+    const r = rayon * (0.55 + suivant() * 0.45);
+    // Un léger bombement au centre : la mousse s'épaissit là où elle est vieille.
+    sommets.push(Math.cos(angle) * r, suivant() * 0.012, Math.sin(angle) * r);
+    index.push(0, 1 + i, 1 + ((i + 1) % cotes));
+  }
+  const geometrie = new THREE.BufferGeometry();
+  geometrie.setAttribute('position', new THREE.Float32BufferAttribute(sommets, 3));
+  geometrie.setIndex(index);
+  geometrie.computeVertexNormals();
+  return geometrie;
 }
 
 /** Jardinière : le végétal cultivé, celui du cœur entretenu. */

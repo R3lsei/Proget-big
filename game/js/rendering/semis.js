@@ -63,25 +63,25 @@ function gabarit(semable) {
  * haute et la salle reste vide.
  */
 export const SEMABLES = Object.freeze([
-  { espece: 'herbe_courte', poids: 10, etats: ['envahi'], hauteurVisee: 0.35, empriseVisee: 0.35 },
-  { espece: 'herbe_haute', poids: 8, etats: ['envahi'], hauteurVisee: 0.75, empriseVisee: 0.45 },
-  { espece: 'herbe_fine_courte', poids: 8, etats: ['envahi', 'soigne'], hauteurVisee: 0.32, empriseVisee: 0.4 },
-  { espece: 'herbe_fine_haute', poids: 6, etats: ['envahi'], hauteurVisee: 0.65, empriseVisee: 0.5 },
-  { espece: 'trefle_1', poids: 7, etats: ['envahi', 'soigne'], hauteurVisee: 0.22, empriseVisee: 0.3 },
-  { espece: 'trefle_2', poids: 7, etats: ['envahi', 'soigne'], hauteurVisee: 0.22, empriseVisee: 0.3 },
-  { espece: 'fougere', poids: 6, etats: ['envahi'], hauteurVisee: 0.95, empriseVisee: 1.1 },
-  { espece: 'plante_1', poids: 5, etats: ['envahi', 'soigne'], hauteurVisee: 0.6, empriseVisee: 0.6 },
-  { espece: 'plante_1_grande', poids: 3, etats: ['envahi'], hauteurVisee: 1.4, empriseVisee: 1.0 },
-  { espece: 'plante_7', poids: 5, etats: ['envahi', 'soigne'], hauteurVisee: 0.55, empriseVisee: 0.5 },
-  { espece: 'plante_7_grande', poids: 3, etats: ['envahi'], hauteurVisee: 1.1, empriseVisee: 0.8 },
-  { espece: 'buisson', poids: 3, etats: ['envahi'], hauteurVisee: 1.0, empriseVisee: 1.0 },
-  { espece: 'buisson_fleuri', poids: 2, etats: ['envahi', 'soigne'], hauteurVisee: 1.05, empriseVisee: 1.0 },
-  { espece: 'champignon', poids: 4, etats: ['envahi'], hauteurVisee: 0.2, empriseVisee: 0.25 },
-  { espece: 'fleurs_3', poids: 4, etats: ['soigne', 'envahi'], hauteurVisee: 0.5, empriseVisee: 0.5 },
-  { espece: 'fleurs_4', poids: 4, etats: ['soigne', 'envahi'], hauteurVisee: 0.5, empriseVisee: 0.5 },
-  { espece: 'caillou_1', poids: 3, etats: ['envahi'], hauteurVisee: 0.16, empriseVisee: 0.35 },
-  { espece: 'caillou_2', poids: 3, etats: ['envahi'], hauteurVisee: 0.16, empriseVisee: 0.35 },
-  { espece: 'rocher', poids: 1, etats: ['envahi'], hauteurVisee: 0.75, empriseVisee: 0.9 },
+  // Couvre-sol : ce qui s'installe le premier dans les joints et les angles.
+  { espece: 'mousse', poids: 16, etats: ['envahi', 'soigne'], hauteurVisee: 0.04, empriseVisee: 0.9 },
+  { espece: 'herbe_courte', poids: 12, etats: ['envahi', 'soigne'], hauteurVisee: 0.30, empriseVisee: 0.30 },
+  { espece: 'herbe_fine_courte', poids: 10, etats: ['envahi', 'soigne'], hauteurVisee: 0.28, empriseVisee: 0.32 },
+  { espece: 'trefle_1', poids: 7, etats: ['envahi', 'soigne'], hauteurVisee: 0.18, empriseVisee: 0.26 },
+  { espece: 'trefle_2', poids: 7, etats: ['envahi', 'soigne'], hauteurVisee: 0.18, empriseVisee: 0.26 },
+
+  // Ce qui vient ensuite, quand plus personne n'entretient.
+  { espece: 'herbe_haute', poids: 6, etats: ['envahi'], hauteurVisee: 0.55, empriseVisee: 0.40 },
+  { espece: 'herbe_fine_haute', poids: 5, etats: ['envahi'], hauteurVisee: 0.50, empriseVisee: 0.42 },
+  { espece: 'fougere', poids: 4, etats: ['envahi'], hauteurVisee: 0.70, empriseVisee: 0.85 },
+  { espece: 'plante_1', poids: 3, etats: ['envahi'], hauteurVisee: 0.50, empriseVisee: 0.50 },
+  { espece: 'plante_7', poids: 3, etats: ['envahi'], hauteurVisee: 0.40, empriseVisee: 0.45 },
+  { espece: 'buisson', poids: 2, etats: ['envahi'], hauteurVisee: 0.80, empriseVisee: 0.85 },
+  { espece: 'champignon', poids: 3, etats: ['envahi'], hauteurVisee: 0.16, empriseVisee: 0.20 },
+
+  // Le sable qui entre par les fissures : le dehors gagne aussi du terrain.
+  { espece: 'caillou_1', poids: 4, etats: ['envahi', 'soigne'], hauteurVisee: 0.10, empriseVisee: 0.28 },
+  { espece: 'caillou_2', poids: 4, etats: ['envahi', 'soigne'], hauteurVisee: 0.10, empriseVisee: 0.28 },
 ]);
 
 /** Distance à garder autour d'un mécanisme, en mètres. */
@@ -94,13 +94,30 @@ const DEGAGEMENT_DEPART = 1.4;
 const MARGE_MUR = 0.35;
 
 /**
+ * Portée de la colonisation, en mètres.
+ *
+ * Rien ne s'installe au MILIEU d'une pièce. La poussière s'accumule dans les
+ * angles, l'eau s'infiltre par les joints du pourtour, les graines arrivent par
+ * les fissures des bords : une friche pousse depuis les limites vers le centre,
+ * jamais l'inverse. Semer uniformément donnait un parterre de jardin
+ * d'agrément au milieu d'un laboratoire — chaque plante était correcte, et
+ * l'ensemble ne racontait rien.
+ *
+ * La probabilité décroît exponentiellement avec la distance au bord le plus
+ * proche : quasi certaine contre une paroi, un tiers à un mètre, un vingtième à
+ * trois. Le centre reste dégagé — ce qui sert aussi le jeu, puisque c'est là
+ * que se joue l'énigme.
+ */
+const PORTEE_COLONISATION = 0.95;
+
+/**
  * Variation de taille d'une plante à l'autre. Exportée pour que les tests
  * bornent la taille RÉELLEMENT produite, et non la formule qu'ils recalculent.
  */
 export const VARIATION = Object.freeze({ min: 0.8, max: 1.25 });
 
 /** Densité par défaut : plantes tentées par mètre carré de sol. */
-export const DENSITE = Object.freeze({ soigne: 2, envahi: 10 });
+export const DENSITE = Object.freeze({ soigne: 3, envahi: 9 });
 
 /**
  * Générateur déterministe. Même graine, même jardin.
@@ -178,6 +195,30 @@ export function interdits(chambre, depart) {
 }
 
 /**
+ * Distance au bord le plus proche : cloisons de la pièce, et lèvres du gouffre.
+ *
+ * Le gouffre compte comme un bord, et pas seulement comme un trou : ses lèvres
+ * sont exposées, humides et jamais balayées. C'est exactement là qu'une friche
+ * s'installe en premier, et cela dessine la faille au sol sans qu'on ait à la
+ * souligner autrement.
+ */
+export function distanceAuBord(chambre, x, z) {
+  const { largeur, profondeur } = chambre.taille;
+  const distances = [
+    (largeur * MODULE) / 2 - Math.abs(x),
+    (profondeur * MODULE) / 2 - Math.abs(z),
+  ];
+  const gouffre = chambre.gouffre;
+  if (gouffre) {
+    // Distance au rectangle du gouffre, vue de l'extérieur : nulle sur sa lèvre.
+    const dx = Math.max(gouffre.xMin * MODULE - x, 0, x - gouffre.xMax * MODULE);
+    const dz = Math.max(gouffre.zMin * MODULE - z, 0, z - gouffre.zMax * MODULE);
+    distances.push(Math.hypot(dx, dz));
+  }
+  return Math.max(0, Math.min(...distances));
+}
+
+/**
  * Un disque de rayon `rayon` centré en (x,z) touche-t-il la zone ?
  *
  * Le point est ramené dans le repère de la zone, ce qui traite une zone tournée
@@ -240,14 +281,18 @@ export function semer(chambre, { depart, graine = 7, densite } = {}) {
     const echelle = forme.facteur * variation;
     const rayon = forme.rayon * variation;
 
-    // 1. Du sol sous TOUTE l'emprise. C'est la règle qui manquait.
+    // 1. La colonisation part des bords. Un tirage au sort pondéré par la
+    //    distance à la paroi la plus proche : contre un mur, presque toujours ;
+    //    au centre de la pièce, presque jamais.
+    if (suivant() > Math.exp(-distanceAuBord(chambre, x, z) / PORTEE_COLONISATION)) continue;
+    // 2. Du sol sous TOUTE l'emprise. C'est la règle qui manquait.
     if (!solPorte(chambre, x, z, rayon)) continue;
-    // 2. Dans la pièce, en gardant le dégagement des cloisons.
+    // 3. Dans la pièce, en gardant le dégagement des cloisons.
     if (Math.abs(x) + rayon > demiX) continue;
     if (Math.abs(z) + rayon > demiZ) continue;
-    // 3. Loin de ce qui se joue.
+    // 4. Loin de ce qui se joue.
     if (zones.some((zone) => empiete(zone, x, z, rayon))) continue;
-    // 4. Sans traverser une plante déjà semée.
+    // 5. Sans traverser une plante déjà semée.
     if (places.some((p) => Math.hypot(p.x - x, p.z - z) < p.rayon + rayon)) continue;
 
     places.push({

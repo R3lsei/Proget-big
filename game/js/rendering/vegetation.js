@@ -20,6 +20,7 @@
 // ne charge pas ne l'est pas.
 
 import * as THREE from 'three';
+import { geometrieMousse, materiaux } from './kit.js';
 
 /** Espèces disponibles, et ce qu'elles racontent du lieu. */
 export const ESPECES = Object.freeze({
@@ -183,6 +184,16 @@ export const ESPECES = Object.freeze({
     attributionRequise: false,
     usage: 'envahi',
   },
+  // Produite par le code : le lot n'a pas de mousse, et une mousse est une
+  // tache au sol, pas un objet. Elle porte les mêmes champs que les espèces
+  // chargées pour que le semis n'ait pas à connaître la différence.
+  mousse: {
+    procedurale: true,
+    emprise: 0.9,
+    hauteur: 0.04,
+    attributionRequise: false,
+    usage: 'envahi',
+  },
   rocher: {
     fichier: 'models/vegetation/rocher.glb',
     emprise: 3.23,
@@ -226,6 +237,22 @@ export async function chargerEspece(nom, chargeur, base = '') {
   if (chargees.has(nom)) return chargees.get(nom);
   const espece = ESPECES[nom];
   if (!espece) return null;
+
+  // Une espèce procédurale n'a pas de fichier : on la fabrique. Elle passe
+  // ensuite par exactement le même chemin que les autres — même cache, même
+  // instanciation, même contrat.
+  if (espece.procedurale) {
+    const charge = {
+      nom, ...espece,
+      parties: [{
+        geometrie: geometrieMousse({ rayon: espece.emprise / 2, graine: 7 }),
+        materiau: materiaux().mousse,
+        locale: new THREE.Matrix4(),
+      }],
+    };
+    chargees.set(nom, charge);
+    return charge;
+  }
 
   try {
     const gltf = await chargeur.loadAsync(base + espece.fichier);

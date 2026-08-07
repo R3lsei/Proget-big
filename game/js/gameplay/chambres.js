@@ -26,6 +26,7 @@
 //   sortie       condition sur les instances (grammaire de utils/conditions)
 //   epreuves     [{ id, affordance }] outils nécessaires
 //   porte        { mur, ouverture }
+//   verriere     mur remplacé par une verrière en arc ('nord'|'est'|'sud'|'ouest')
 //   decor        éléments non bloquants : jardinières, lierre
 //
 // ─── Règle absolue ───────────────────────────────────────────────────────────
@@ -40,6 +41,9 @@ const REVEIL = {
   titre: 'Salle de réveil',
   etat: 'soigne',
   taille: { largeur: 8, profondeur: 8 },
+  // Le côté vitré : une verrière en arc ouvrant sur le désert. C'est par là que
+  // le joueur comprend où il est avant qu'aucun texte ne le lui dise.
+  verriere: 'est',
   // Deux objets lourds pour une seule plaque : la chambre reste franchissable
   // même si le joueur en perd un, et il découvre que plusieurs choses marchent.
   objets: ['brique', 'caillou', 'couteau', 'éponge'],
@@ -67,6 +71,7 @@ const SERRE = {
   titre: 'Serre abandonnée',
   etat: 'envahi',
   taille: { largeur: 10, profondeur: 8 },
+  verriere: 'ouest',
   // Deux plaques à maintenir en même temps : il faut donc deux objets lourds
   // DISTINCTS. C'est précisément le cas que le vérificateur de résolubilité sait
   // détecter, et la raison pour laquelle il ne se contente pas d'une suite de
@@ -119,9 +124,10 @@ const SERRE = {
   sortie: { toutes: ['plaque_gauche', 'plaque_droite', 'pont'] },
   epreuves: [{ id: 'trappe', affordance: 'faire_levier' }],
   porte: { mur: 'nord', ouverture: 2 },
+  // Plus de lierre procédural : ses tiges filiformes juraient à côté des vrais
+  // modèles, et l'une d'elles se retrouvait derrière la verrière en arc. La
+  // colonisation par les bords fait ce travail avec de la vraie végétation.
   decor: [
-    { type: 'lierre', largeur: 10, densite: 90, graine: 12, x: 0, z: 3.6 },
-    { type: 'lierre', largeur: 8, densite: 70, graine: 31, x: -4.6, z: 0, rotation: Math.PI / 2 },
     { type: 'jardiniere', largeur: 3, x: 3.2, z: 2.6 },
   ],
 };
