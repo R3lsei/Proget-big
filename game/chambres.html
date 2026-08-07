@@ -33,6 +33,14 @@
   #sacoche .vide { opacity: .6; font-style: italic; }
   kbd { background: #263034; border-radius: .2rem; padding: 0 .35rem;
         font: inherit; font-size: .9em; color: #9fe8cd; }
+  #panne { position: fixed; inset: 0; display: none; place-content: center;
+           background: #0b0d0e; padding: 2rem; }
+  #panne.visible { display: grid; }
+  #panne div { max-width: 34rem; margin: auto; border-left: 3px solid #ff7a5c;
+               background: #12181a; padding: 1.4rem 1.8rem; border-radius: .4rem; }
+  #panne h1 { margin: 0 0 .8rem; font-size: 1.2rem; color: #ff9d85; }
+  #panne code { background: #263034; padding: .1rem .4rem; border-radius: .2rem; }
+  #panne p { margin: .7rem 0; }
 </style>
 </head>
 <body>
@@ -54,6 +62,28 @@
   <b>Sacoche</b> — <kbd>C</kbd> scanner · <kbd>1</kbd>…<kbd>9</kbd> invoquer
   <div id="sacoche-liste" class="vide">Rien de mémorisé.</div>
 </div>
+
+<div id="panne"><div>
+  <h1>Le jeu n'a pas pu démarrer</h1>
+  <p><b>Vous avez probablement ouvert ce fichier par double-clic.</b> Les
+     navigateurs interdisent à une page ouverte depuis le disque de charger ses
+     propres modules — et la caméra exige de toute façon une adresse
+     <code>localhost</code>.</p>
+  <p>Lancez plutôt, à la racine du projet :</p>
+  <p><code>JOUER-LES-CHAMBRES-Windows.bat</code> &nbsp;(ou
+     <code>.command</code> sur Mac/Linux)</p>
+  <p>En ligne de commande : <code>python jouer.py</code></p>
+</div></div>
+
+<script>
+// Volontairement un script CLASSIQUE, pas un module : si les modules sont
+// bloqués, c'est justement lui qui doit encore s'exécuter pour le dire.
+// Un écran noir muet ne renseigne personne — et c'est exactement ce que ce jeu
+// affichait quand on l'ouvrait par double-clic.
+setTimeout(function () {
+  if (!window.NOVA) document.getElementById('panne').classList.add('visible');
+}, 2500);
+</script>
 
 <script type="importmap">
 { "imports": { "three": "./lib/three.module.js" } }
