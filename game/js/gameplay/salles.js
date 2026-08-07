@@ -20,9 +20,9 @@
 /**
  * Salles du jeu.
  *
- * Vide pour l'instant : la grammaire d'énigmes et le chargeur de salles (T-015)
- * n'existent pas encore, et déclarer ici des salles que le jeu n'utilise pas
- * donnerait une fausse assurance. Le vérificateur refuse d'ailleurs de prétendre
- * avoir prouvé quoi que ce soit sur une liste vide.
+ * Simple réexport : les chambres sont déclarées dans `chambres.js`, au format
+ * que le bâtisseur 3D lit également. C'est tout l'intérêt — la barrière protège
+ * exactement les chambres que le joueur parcourt, pas une copie tenue à jour à
+ * la main qui finirait par diverger.
  */
-export const SALLES = Object.freeze([]);
+export { CHAMBRES as SALLES } from './chambres.js';

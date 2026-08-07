@@ -388,3 +388,101 @@ export function ambiance({ intensite = 0.5 } = {}) {
   lumiere.name = 'ambiance';
   return lumiere;
 }
+
+/**
+ * Cloison percée d'une ouverture de porte.
+ *
+ * Construite en trois morceaux — deux jambages et un linteau — plutôt qu'en
+ * découpant un mur plein. Découper produirait une géométrie irrégulière que la
+ * fusion par zone ne saurait plus regrouper, et l'ouverture ne tomberait plus
+ * sur la grille.
+ */
+export function murPerce({
+  largeur = 8, hauteur = HAUTEUR_CHAMBRE, etat = 'soigne',
+  ouverture = 2, hauteurOuverture = 2,
+} = {}) {
+  const groupe = new THREE.Group();
+  groupe.name = `mur_perce_${largeur}_${ouverture}`;
+
+  const cote = Math.floor((largeur - ouverture) / 2);
+  const decalage = (ouverture + cote) * MODULE / 2;
+
+  for (const signe of [-1, 1]) {
+    if (cote <= 0) continue;
+    const jambage = mur({ largeur: cote, hauteur, etat });
+    jambage.position.x = signe * decalage;
+    groupe.add(jambage);
+  }
+
+  const restant = hauteur - hauteurOuverture;
+  if (restant > 0) {
+    const linteau = mur({ largeur: ouverture, hauteur: restant, etat });
+    linteau.position.y = hauteurOuverture * MODULE;
+    groupe.add(linteau);
+  }
+  return groupe;
+}
+
+/**
+ * Porte à deux vantaux, coulissant dans les jambages.
+ *
+ * `ouvrir` prend une progression de 0 à 1 : l'animation appartient à l'appelant.
+ * Une porte qui s'anime toute seule ne peut ni être testée d'un coup, ni être
+ * restituée dans l'état exact où une sauvegarde l'a laissée.
+ */
+export function porte({ ouverture = 2, hauteur = 2, etat = 'soigne' } = {}) {
+  const groupe = new THREE.Group();
+  groupe.name = 'porte';
+  const m = materiaux();
+
+  const vantaux = [];
+  for (const signe of [-1, 1]) {
+    const vantail = new THREE.Mesh(
+      new THREE.BoxGeometry(ouverture * MODULE / 2 - 0.01, hauteur * MODULE, 0.1),
+      etat === 'envahi' ? m.panneau_use : m.structure);
+    vantail.position.set(signe * ouverture * MODULE / 4, hauteur * MODULE / 2, 0);
+    vantail.castShadow = true;
+    vantail.receiveShadow = true;
+    vantaux.push(vantail);
+    groupe.add(vantail);
+  }
+
+  const course = ouverture * MODULE / 2;
+  groupe.userData.ouvrir = (progression) => {
+    const p = Math.min(1, Math.max(0, progression));
+    vantaux[0].position.x = -ouverture * MODULE / 4 - course * p;
+    vantaux[1].position.x = ouverture * MODULE / 4 + course * p;
+  };
+  return groupe;
+}
+
+/**
+ * Socle visible d'un réceptacle.
+ *
+ * Sa lisibilité prime sur son réalisme : le joueur doit comprendre au premier
+ * coup d'œil qu'il y a là quelque chose à activer, et voir sans ambiguïté si
+ * c'est fait. Un mécanisme dont l'état se devine est un mécanisme qui produit
+ * de la frustration au lieu de la réflexion.
+ */
+export function socleReceptacle({ largeur = 1, etat = 'soigne' } = {}) {
+  const groupe = new THREE.Group();
+  groupe.name = 'socle';
+  const m = materiaux();
+
+  const plaque = new THREE.Mesh(
+    new THREE.BoxGeometry(largeur * MODULE, 0.06, largeur * MODULE), m.structure);
+  plaque.position.y = 0.03;
+  plaque.receiveShadow = true;
+  groupe.add(plaque);
+
+  const temoin = new THREE.Mesh(
+    new THREE.BoxGeometry(largeur * MODULE * 0.8, 0.02, largeur * MODULE * 0.8),
+    new THREE.MeshBasicMaterial({ color: 0xff5533 }));
+  temoin.position.y = 0.07;
+  groupe.add(temoin);
+
+  groupe.userData.signaler = (actif) => {
+    temoin.material.color.setHex(actif ? 0x44dd88 : 0xff5533);
+  };
+  return groupe;
+}

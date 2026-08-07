@@ -6,6 +6,19 @@ Versionnement [SemVer](https://semver.org/lang/fr/).
 ## [Non publié]
 
 ### Ajouté
+- **Chambres déclarées** (T-022) : une seule déclaration par chambre, lue par
+  deux programmes qui n'ont rien à voir — le bâtisseur 3D la construit, le
+  vérificateur de résolubilité la prouve franchissable. Ailleurs, le niveau et
+  sa validation vivent dans deux fichiers : on déplace un objet dans l'un, on
+  oublie l'autre, et la salle validée n'est plus celle qu'on joue. Ici il n'y a
+  rien à synchroniser.
+  Deux chambres existent, bâties et prouvées : la salle de réveil et la serre
+  abandonnée. La barrière anti-blocage protège enfin de vraies salles au lieu de
+  tourner à vide.
+  Les boîtes de collision sont dérivées de la géométrie réellement posée, jamais
+  redéclarées : un mur qu'on voit est un mur qui arrête, et l'ouverture d'une
+  porte reste franchissable. La position de départ est calculée, pas écrite —
+  une position à la main finit dans une cloison au premier redimensionnement.
 - **Végétation à base de vrais modèles** (T-021) : le feuillage procédural a été
   tenté trois fois et a donné, dans l'ordre, du confetti vert, un feu d'artifice
   et des roseaux clairsemés. La structure était juste, l'approche ne l'était pas :
@@ -131,6 +144,14 @@ Versionnement [SemVer](https://semver.org/lang/fr/).
 - Lumières : 25 sources → pool de 6 suivant le joueur, coût de shader constant.
 
 ### Corrigé
+- **Deux conventions cardinales contradictoires** (B-020) : « nord » désignait
+  +Z pour placer les murs et −Z pour orienter le joueur. Résultat : le joueur
+  démarrait collé à la porte de sortie et regardait dedans. Une seule normale
+  sert désormais à placer le mur, poser la porte et orienter le regard.
+- **Décor placé hors de la pièce** (B-021) : les positions de décor de la serre
+  étaient écrites en mètres alors que le format est en modules de 1,2 m. Le
+  lierre se retrouvait à sept mètres du centre dans une pièce qui s'arrête à six,
+  donc encastré dans le mur — où il bloquait le passage.
 - **Dix objets réels sans aucun usage** (B-017) : plateau, assiette, planche à
   découper, ruban adhésif, interrupteur et cinq autres étaient reconnus puis
   rejetés — l'instant exact où le joueur cesse de croire au système. Deux causes :

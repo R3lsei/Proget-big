@@ -23,7 +23,6 @@
 | T-016 | Mesure embarquée de la latence de scan | T-012 ✅ |
 | T-015 | Grammaire d'énigmes et chargeur de salles | T-012 ✅ |
 | T-017 | Transformation d'objets (briser un objet cassant → tesson tranchant) | T-012 ✅ |
-| T-022 | Chambres déclarées : un fichier, deux lecteurs (bâtisseur + vérificateur) | T-020 ✅, T-014 ✅ |
 | T-023 | Espèces manquantes : lianes et mousses pour les zones envahies | T-021 ✅ |
 | T-024 | Textures de matières et occlusion ambiante | T-020 ✅ |
 
@@ -37,6 +36,7 @@
 | T-000 | Conception validée (7 axes) | SPEC, GAMEPLAY, ARCHITECTURE écrits |
 | T-000b | Faisabilité open-vocabulary | transformers.js v4.2.0 disponible, bundle autonome 510 Ko, WebGPU détecté |
 | T-000c | Banc de mesure livré | `tools/spike-detection/`, zéro erreur JS |
+| T-022 | Chambres déclarées | **Un fichier, deux lecteurs** : la même déclaration nourrit le bâtisseur 3D et le vérificateur de résolubilité. Rien à synchroniser, donc rien à oublier. Deux chambres réelles bâties et prouvées. La barrière anti-blocage protège désormais de vraies salles. Colliders dérivés de la géométrie posée, position de départ calculée. 16 tests ; a trouvé deux conventions cardinales contradictoires et un décor placé hors de la pièce |
 | T-021 | Végétation à base de vrais modèles | Chaîne complète établie : récupération de modèles libres, simplification, compression Draco + WebP, instanciation. Plante en pot 5,8 Mo → 1,1 Mo, version lointaine à 12 % → 516 Ko. Un massif coûte un appel de dessin par partie du modèle, pas un par plante. Crédits vérifiés par test — l'oubli d'une licence sur la version dérivée a été rattrapé en dix minutes. 11 tests |
 | T-020 | Kit modulaire et direction artistique | Refonte de la carte engagée : grille de 1,2 m, panneaux à joints creux, verrières, un soleil unique porteur d'ombres à la place de vingt lampes ponctuelles. Deux états du lieu — cœur soigné, périphérie envahie. Palette gelée en trois familles. 24 tests verrouillant les invariants invisibles à l'œil : matériaux partagés, feuillage instancié, décor déterministe, lierre plaqué. **Végétation encore insuffisante** — voir T-021 |
 | T-014 | **Résolubilité bloquante** | Prouve qu'une salle est franchissable avec ses seuls objets. Le cœur n'est pas une suite de vérifications mais un **couplage maximal** : deux plaques simultanées peuvent avoir la même unique brique pour solution — chacune satisfaisable, l'ensemble non. Refuse de conclure au-delà de 16 mécanismes plutôt que d'annoncer une preuve non exhaustive. Branché en CI (`npm run verifier`), bloquant au même titre qu'un test. 22 tests ; mutation, 7 régressions sur 7 détectées après correction d'un test non discriminant |

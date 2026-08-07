@@ -33,6 +33,18 @@ import { RECEPTACLES, objetsActivant } from './mecanismes.js';
 export const MAX_RECEPTACLES = 16;
 
 /**
+ * Type d'un réceptacle déclaré.
+ *
+ * Une chambre déclare `{ type, x, z }` parce que le bâtisseur a besoin de la
+ * position ; le vérificateur, lui, n'en a que faire. Accepter aussi la forme
+ * courte `'plaque_pression'` garde les cas de test lisibles sans imposer des
+ * coordonnées factices qui ne prouveraient rien.
+ */
+function typeDeReceptacle(declaration) {
+  return typeof declaration === 'string' ? declaration : declaration?.type;
+}
+
+/**
  * Objets du catalogue capables de satisfaire un besoin.
  *
  * Un besoin est soit un outil (`{ affordance }`), soit un mécanisme
@@ -119,7 +131,8 @@ export function verifierSalle(salle, chercher) {
   }
 
   const instances = Object.keys(salle.receptacles ?? {});
-  for (const [instance, type] of Object.entries(salle.receptacles ?? {})) {
+  for (const [instance, declaration] of Object.entries(salle.receptacles ?? {})) {
+    const type = typeDeReceptacle(declaration);
     if (!RECEPTACLES[type]) return echec(salle, `réceptacle inconnu : ${instance} → ${type}`);
   }
 
@@ -143,7 +156,8 @@ export function verifierSalle(salle, chercher) {
 function tenter(salle, combinaison, catalogue) {
   const mobilisees = combinaison.map((instance) => ({
     id: instance,
-    candidats: objetsCapables({ receptacle: salle.receptacles[instance] }, catalogue)
+    candidats: objetsCapables(
+      { receptacle: typeDeReceptacle(salle.receptacles[instance]) }, catalogue)
       .map((entree) => entree.nom),
   }));
 
