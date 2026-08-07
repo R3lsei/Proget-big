@@ -85,6 +85,13 @@ setTimeout(function () {
 }, 2500);
 </script>
 
+<!-- Reconnaissance d'objets. Scripts CLASSIQUES, donc exécutés avant le module
+     qui suit : `cocoSsd` doit exister quand le jeu s'initialise. Leur absence
+     ici est ce qui affichait « Bibliothèque COCO-SSD absente » — la page avait
+     été écrite sans eux, et rien ne le vérifiait. -->
+<script src="lib/tf.min.js"></script>
+<script src="lib/coco-ssd.min.js"></script>
+
 <script type="importmap">
 { "imports": { "three": "./lib/three.module.js" } }
 </script>

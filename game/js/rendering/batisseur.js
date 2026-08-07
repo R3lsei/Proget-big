@@ -235,6 +235,9 @@ function decouperSol(chambre) {
 /** Gabarit d'un objet transportable : petit, cubique, franchissable en marchant. */
 export const GABARIT_OBJET = Object.freeze({ rayon: 0.16, hauteur: 0.32 });
 
+/** Marge latérale du seuil de sortie, en mètres : le rayon du joueur. */
+const MARGE_SEUIL = 0.35;
+
 /**
  * Matérialise les objets de la chambre à leurs poses déclarées.
  *
@@ -302,6 +305,41 @@ function ajouterColliders(piece, colliders) {
     if (!noeud.isMesh) return;
     colliders.push(depuisBox3(new THREE.Box3().setFromObject(noeud)));
   });
+}
+
+/**
+ * Le seuil de sortie : le plan du mur percé, et la direction pour le franchir.
+ *
+ * Dérivé des MÊMES `ORIENTATIONS` que le mur et la porte. Recalculer ce seuil à
+ * la main dans la boucle de jeu le laisserait dériver au premier changement de
+ * convention cardinale — et le projet en a déjà connu deux qui se
+ * contredisaient.
+ */
+export function seuilDe(chambre) {
+  const murDeSortie = chambre.porte?.mur ?? 'nord';
+  const [nx, nz] = ORIENTATIONS[murDeSortie].normale;
+  const { largeur, profondeur } = chambre.taille;
+  const distance = ((murDeSortie === 'nord' || murDeSortie === 'sud')
+    ? enMetres(profondeur) : enMetres(largeur)) / 2;
+  return { nx, nz, distance, ouverture: enMetres(chambre.porte?.ouverture ?? 2) };
+}
+
+/**
+ * Le joueur a-t-il franchi la porte ?
+ *
+ * On teste le plan du mur, pas une zone posée au-delà : il n'y a PAS de sol
+ * derrière la porte, et le joueur commence à tomber dès le pas suivant. Le
+ * franchissement doit donc être constaté au moment même où il passe.
+ */
+export function aFranchi(position, chambre) {
+  const { nx, nz, distance, ouverture } = seuilDe(chambre);
+  const avance = position.x * nx + position.z * nz;
+  if (avance < distance) return false;
+  // Et par l'ouverture, pas à travers le mur : le long du mur, l'écart au centre
+  // doit tenir dans la largeur de la porte. La marge couvre le rayon du joueur,
+  // dont le centre reste en deçà du chambranle quand son corps le frôle.
+  const lateral = Math.abs(position.x * -nz + position.z * nx);
+  return lateral <= ouverture / 2 + MARGE_SEUIL;
 }
 
 /**

@@ -20,7 +20,7 @@ import {
   creerStabilisateur, stabiliser, versEntree, meilleure,
 } from '../perception/detecteur.js';
 import * as cocossd from '../perception/detecteurs/cocossd.js';
-import { batir, departDe } from '../rendering/batisseur.js';
+import { batir, departDe, aFranchi } from '../rendering/batisseur.js';
 import { soleil, ambiance } from '../rendering/kit.js';
 import {
   creerJoueur, regarder, avancer, basculerPrise, majObjets, occupations,
@@ -40,8 +40,6 @@ const VITESSE_PORTE = 1.4;
  * @returns {object} l'état, exposé pour les tests automatisés
  */
 export function demarrer(canvas, indexChambre = 0) {
-  const chambre = CHAMBRES[indexChambre];
-
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
   renderer.setSize(canvas.clientWidth || 1280, canvas.clientHeight || 720);
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -55,17 +53,16 @@ export function demarrer(canvas, indexChambre = 0) {
   scene.environment = new THREE.PMREMGenerator(renderer)
     .fromScene(new RoomEnvironment(), 0.04).texture;
 
-  const bati = batir(chambre);
-  scene.add(bati.groupe);
   scene.add(soleil({ portee: 26 }));
   scene.add(ambiance());
 
   const camera = new THREE.PerspectiveCamera(
     72, (canvas.clientWidth || 1280) / (canvas.clientHeight || 720), 0.1, 200);
 
-  const depart = departDe(chambre);
-  const joueur = creerJoueur(depart);
-  const objets = [...bati.objets.values()];
+  // Réassignés à chaque chambre. Ce sont des `let` et non des `const` parce que
+  // le jeu ENCHAÎNE désormais les chambres dans la même page : tout recharger
+  // en rouvrant l'URL perdrait la sacoche, qui doit survivre à toute la partie.
+  let chambre; let bati; let depart; let joueur; let objets;
 
   const intentions = {
     avancer: false, reculer: false, gauche: false, droite: false, sauter: false,
@@ -79,12 +76,61 @@ export function demarrer(canvas, indexChambre = 0) {
   };
 
   const etat = {
-    chambre, joueur, objets, bati, scene, camera, renderer,
+    scene, camera, renderer,
     ouverture: 0, ouverte: false, actifs: new Set(),
     enclenches: new Set(),
+    // Créé UNE fois, hors du chargement de chambre : ce que le joueur a montré
+    // à sa caméra lui appartient pour toute la partie. Le remettre à zéro à
+    // chaque porte franchie punirait le joueur d'avoir progressé.
     inventaire: creerInventaire(),
+    indexChambre: 0,
+    termine: false,
     dernierMessage: '',
   };
+
+  /**
+   * Charge une chambre, en remplaçant celle en place.
+   *
+   * Ce qui est conservé et ce qui est jeté n'est pas un détail d'implémentation
+   * mais une règle de jeu : la sacoche traverse les chambres, les mécanismes
+   * non. Un terminal piraté dans la salle de réveil n'a aucun sens dans la
+   * serre.
+   */
+  function chargerChambre(index) {
+    if (bati) {
+      scene.remove(bati.groupe);
+      // Les géométries sont propres à la chambre et occupent la mémoire de la
+      // carte graphique jusqu'à libération explicite ; les matières, elles, sont
+      // PARTAGÉES par le kit — les libérer viderait la chambre suivante.
+      bati.groupe.traverse((noeud) => noeud.geometry?.dispose());
+    }
+    // Les objets invoqués repartent dans la sacoche : leur maillage appartenait
+    // à la chambre qu'on vient de quitter, et les laisser comptés occuperait des
+    // places pour des objets qui n'existent plus.
+    for (const corps of objets ?? []) {
+      if (corps.invoque) dematerialiser(etat.inventaire, corps.nom);
+    }
+
+    chambre = CHAMBRES[index];
+    bati = batir(chambre);
+    scene.add(bati.groupe);
+    depart = departDe(chambre);
+    joueur = creerJoueur(depart);
+    objets = [...bati.objets.values()];
+
+    etat.chambre = chambre;
+    etat.bati = bati;
+    etat.joueur = joueur;
+    etat.objets = objets;
+    etat.indexChambre = index;
+    etat.actifs = new Set();
+    etat.enclenches = new Set();
+    etat.ouverture = 0;
+    etat.ouverte = false;
+  }
+  etat.chargerChambre = chargerChambre;
+
+  chargerChambre(indexChambre);
 
   /**
    * Une seule touche pour agir, et l'ordre des priorités compte.
@@ -318,6 +364,29 @@ export function demarrer(canvas, indexChambre = 0) {
     etat.ouverture += Math.sign(cible - etat.ouverture)
       * Math.min(Math.abs(cible - etat.ouverture), VITESSE_PORTE * dt);
     bati.porte.ouvrir(etat.ouverture);
+
+    // Franchir la porte fait passer à la chambre suivante.
+    //
+    // Sans cela, la porte s'ouvrait sur le VIDE : il n'y a pas de sol au-delà du
+    // mur, le joueur tombait, et le jeu le remettait au départ en annonçant
+    // « rien n'est perdu ». La récompense d'avoir résolu la salle était une
+    // chute. Le test se fait ici, dans le pas de simulation, parce que le joueur
+    // commence à tomber dès le pas suivant.
+    if (etat.ouverte && !etat.termine && aFranchi(joueur, chambre)) {
+      const suivante = etat.indexChambre + 1;
+      if (suivante < CHAMBRES.length) {
+        chargerChambre(suivante);
+        etat.dernierMessage = `${chambre.titre}.`;
+        return;   // le reste du pas concernait la chambre qu'on vient de quitter
+      }
+      // Dernière chambre : on ramène le joueur en deçà du seuil. Le laisser
+      // passer le ferait tomber dans le vide, et le message de chute
+      // remplacerait aussitôt celui de victoire — on finirait le jeu par un
+      // échec affiché.
+      etat.termine = true;
+      Object.assign(joueur, { x: depart.x, y: depart.y, z: depart.z, vy: 0 });
+      etat.dernierMessage = 'Vous êtes sorti du complexe. Fin de la démonstration.';
+    }
 
     camera.position.set(joueur.x, joueur.y + HAUTEUR_YEUX, joueur.z);
     camera.rotation.set(joueur.pitch, joueur.yaw, 0, 'YXZ');
