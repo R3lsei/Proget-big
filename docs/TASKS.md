@@ -32,6 +32,7 @@
 
 | ID | Tâche | Résultat |
 |---|---|---|
+| T-031 | **Le jeu se lance sans rien installer** | Trois livraisons de suite ont échoué au LANCEMENT — écran gris, page 404, Python absent — pendant que 296 tests passaient au vert. Le jeu était juste et injouable, et c'est le joueur qui a fait la QA, capture par capture. Serveur de secours en PowerShell pur (`TcpListener`, donc aucun droit administrateur requis) : plus aucune installation exigée sur Windows. Et surtout `npm run lancement`, qui démarre les deux serveurs pour de vrai et réclame la page **plus les 28 modules qu'elle charge** — un import cassé donnait un écran gris muet, il donne une ligne rouge. Bloquant en CI. 5 mutations sur 5 détectées, après réécriture d'un test non discriminant : `fetch` normalise `/../` avant l'envoi, si bien que la vérification anti-remontée passait quoi qu'il arrive |
 | T-001 | Banc de mesure hors-ligne | **Abandonné.** Trois tentatives, aucune mesure obtenue : session ONNX refusée, puis page servie depuis le cache. Le coût a dépassé le bénéfice. Remplacé par T-016, qui mesure la même chose sans rien demander au joueur. Le banc reste dans `tools/` pour qui veut. Décision assumée : on conçoit pour le pire cas (scan lent), l'ergonomie s'adapte à la mesure réelle |
 | T-000 | Conception validée (7 axes) | SPEC, GAMEPLAY, ARCHITECTURE écrits |
 | T-000b | Faisabilité open-vocabulary | transformers.js v4.2.0 disponible, bundle autonome 510 Ko, WebGPU détecté |

@@ -6,6 +6,22 @@ Versionnement [SemVer](https://semver.org/lang/fr/).
 ## [Non publié]
 
 ### Ajouté
+- **Le jeu ne dépend plus de Python** (T-031) : un serveur local en PowerShell
+  pur, présent sur tout Windows depuis la version 7, sert désormais le jeu quand
+  Python est absent. Exiger l'installation d'un langage pour ouvrir une page web
+  est un coût que le joueur payait sans rien recevoir en échange.
+  Écrit sur `TcpListener` et non sur `HttpListener` : ce dernier passe par
+  http.sys, qui peut réclamer un enregistrement d'URL et donc les droits
+  administrateur. Un socket brut n'exige rien de personne — au prix d'une
+  trentaine de lignes d'analyse HTTP, et ce prix est juste.
+- **Vérification automatique du lancement** (T-031) : les deux serveurs sont
+  démarrés pour de vrai, puis interrogés sur la page **et sur les 28 modules
+  qu'elle finit par charger**. Un import cassé donne un écran gris muet en
+  navigateur ; il donne maintenant une ligne rouge en CI.
+  Ce contrôle existe parce que trois livraisons de suite ont échoué au
+  lancement — écran gris, page 404, Python absent — pendant que 296 tests
+  passaient. Aucun ne regardait de ce côté, et c'est le joueur qui a fait ce
+  travail, capture d'écran par capture d'écran, trois fois.
 - **La caméra est branchée** (T-030) : la chaîne complète fonctionne — webcam,
   détection, traduction vers la base curatée, sacoche, matérialisation dans la
   salle. Vérifiée dans un vrai navigateur avec une webcam simulée : montrer un
@@ -216,6 +232,26 @@ Versionnement [SemVer](https://semver.org/lang/fr/).
 - Lumières : 25 sources → pool de 6 suivant le joueur, coût de shader constant.
 
 ### Corrigé
+- **« Python est introuvable » sur un ordinateur sans Python** (B-027) : le
+  lanceur Windows se contentait de `where python`. Or Windows installe un faux
+  `python.exe` qui n'ouvre que le Microsoft Store : `where` le trouve, on croit
+  Python installé, et le joueur reçoit un message du système à la place du jeu.
+  On EXÉCUTE désormais chaque interpréteur — seul un vrai lancement distingue
+  l'outil du leurre — et l'absence de Python n'est plus un échec du tout,
+  puisque PowerShell prend le relais.
+- **Page 404 au lancement** (B-026) : le lanceur ouvrait un serveur sans vérifier
+  qu'il avait quelque chose à servir. Deux causes se cachaient derrière la même
+  page d'erreur : une archive extraite à moitié, et un serveur d'une extraction
+  précédente encore accroché au port 8000, qui servait *son* dossier. Le
+  navigateur affichait alors un 404 venu d'ailleurs, sans rien pour le dire.
+  La page est maintenant vérifiée avant l'ouverture du socket, le premier port
+  réellement libre est retenu, et l'adresse **comme le dossier servi** sont
+  affichés.
+- **Diagnostic faux masquant le vrai** (B-025) : le lanceur Windows avalait la
+  sortie d'erreur et concluait « Python n'a pas été trouvé » sur n'importe quel
+  échec. Le message exact qui aurait résolu le problème était remplacé par un
+  message qui l'égarait. Les erreurs passent désormais, et la fenêtre reste
+  ouverte pour qu'on puisse les lire.
 - **Passerelle infranchissable alors qu'elle est sortie** (B-024) : son tablier
   faisait douze centimètres de surépaisseur, que la résolution de collisions
   traitait comme un mur. Le joueur se cognait à un pont qu'il voyait déployé.

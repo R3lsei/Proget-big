@@ -28,6 +28,14 @@ jobs:
       - name: Vérifier la résolubilité des salles
         run: npm run verifier
 
+      # Le jeu peut être juste et rester injouable : trois livraisons de suite
+      # ont échoué au LANCEMENT — écran gris, page 404, Python absent — pendant
+      # que les 296 tests passaient. Personne ne le voyait avant le joueur.
+      # Les deux serveurs sont ici démarrés pour de vrai, puis interrogés.
+      # `pwsh` est préinstallé sur les exécuteurs ubuntu-latest.
+      - name: Vérifier que le jeu démarre
+        run: npm run lancement
+
   python:
     name: Tests Python
     runs-on: ubuntu-latest

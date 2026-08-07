@@ -9,7 +9,8 @@
     "test": "node --import ./tests/js/enregistrer-resolveur.mjs --test \"tests/js/*.test.js\"",
     "test:watch": "node --import ./tests/js/enregistrer-resolveur.mjs --test --watch \"tests/js/*.test.js\"",
     "verifier": "node tools/verifier-salles.mjs",
-    "valider": "npm test && npm run verifier"
+    "lancement": "node tools/verifier-lancement.mjs",
+    "valider": "npm test && npm run verifier && npm run lancement"
   },
   "engines": {
     "node": ">=20"
