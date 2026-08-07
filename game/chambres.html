@@ -41,6 +41,9 @@
   #panne h1 { margin: 0 0 .8rem; font-size: 1.2rem; color: #ff9d85; }
   #panne code { background: #263034; padding: .1rem .4rem; border-radius: .2rem; }
   #panne p { margin: .7rem 0; }
+  #chargement { position: fixed; inset: 0; display: grid; place-content: center;
+                background: #0b0d0e; color: #9fe8cd; letter-spacing: .04em; }
+  #chargement.parti { display: none; }
 </style>
 </head>
 <body>
@@ -64,33 +67,88 @@
 </div>
 
 <div id="panne"><div>
-  <h1>Le jeu n'a pas pu démarrer</h1>
-  <p><b>Vous avez probablement ouvert ce fichier par double-clic.</b> Les
-     navigateurs interdisent à une page ouverte depuis le disque de charger ses
-     propres modules — et la caméra exige de toute façon une adresse
-     <code>localhost</code>.</p>
-  <p>Lancez plutôt, à la racine du projet :</p>
-  <p><code>JOUER-LES-CHAMBRES-Windows.bat</code> &nbsp;(ou
-     <code>.command</code> sur Mac/Linux)</p>
-  <p>En ligne de commande : <code>python jouer.py</code></p>
+  <h1 id="panne-titre"></h1>
+  <div id="panne-corps"></div>
 </div></div>
+
+<!-- Le joueur doit voir que quelque chose se passe. Trois mégaoctets se
+     chargent avant la première image ; un écran noir muet pendant ce temps se
+     lit comme une panne, et c'est ce qui a fait croire à un jeu cassé. -->
+<div id="chargement">Chargement du complexe…</div>
 
 <script>
 // Volontairement un script CLASSIQUE, pas un module : si les modules sont
 // bloqués, c'est justement lui qui doit encore s'exécuter pour le dire.
-// Un écran noir muet ne renseigne personne — et c'est exactement ce que ce jeu
-// affichait quand on l'ouvrait par double-clic.
+// Un écran noir muet ne renseigne personne.
+//
+// ─── Ce qui a mal tourné, et la leçon ────────────────────────────────────────
+// La première version se contentait de « pas de window.NOVA après 2,5 s » pour
+// conclure au double-clic. Puis le jeu a gagné 1,4 Mo de TensorFlow, 1,3 Mo de
+// three.js et dix-neuf modèles — et le délai n'a jamais été revu. Sur une
+// machine ordinaire le chargement dépasse 2,5 s, et le joueur recevait un
+// diagnostic FAUX : on lui expliquait qu'il avait double-cliqué alors qu'il
+// avait lancé le jeu correctement.
+//
+// C'est exactement le défaut déjà corrigé dans le lanceur Windows, réapparu
+// ailleurs : un message d'erreur sûr de lui qui remplace le vrai. On ne
+// conclut donc plus d'un délai, mais de PREUVES — les modules se sont-ils
+// exécutés, une erreur a-t-elle été levée — et le délai n'est plus qu'un
+// dernier recours, largement dimensionné.
+
+window.NOVA_ERREUR = null;
+addEventListener('error', function (e) {
+  window.NOVA_ERREUR = e.message + (e.filename ? '\n' + e.filename + ':' + e.lineno : '');
+});
+addEventListener('unhandledrejection', function (e) {
+  window.NOVA_ERREUR = 'Promesse rejetée : ' + ((e.reason && e.reason.message) || e.reason);
+});
+
+function afficherPanne(titre, corps) {
+  var panne = document.getElementById('panne');
+  document.getElementById('panne-titre').textContent = titre;
+  document.getElementById('panne-corps').innerHTML = corps;
+  panne.classList.add('visible');
+}
+
+var DOUBLE_CLIC =
+  '<p><b>Vous avez probablement ouvert ce fichier par double-clic.</b> Les '
+  + 'navigateurs interdisent à une page ouverte depuis le disque de charger ses '
+  + 'propres modules — et la caméra exige de toute façon une adresse '
+  + '<code>localhost</code>.</p>'
+  + '<p>Lancez plutôt, à la racine du projet :</p>'
+  + '<p><code>JOUER-LES-CHAMBRES-Windows.bat</code> (ou <code>.command</code> sur Mac/Linux)</p>'
+  + '<p>En ligne de commande : <code>python jouer.py</code></p>';
+
 setTimeout(function () {
-  if (!window.NOVA) document.getElementById('panne').classList.add('visible');
-}, 2500);
+  if (window.NOVA) return;
+  if (window.NOVA_ERREUR) {
+    afficherPanne('Le jeu a rencontré une erreur',
+      '<p>Le message exact, à me transmettre tel quel :</p>'
+      + '<p><code>' + String(window.NOVA_ERREUR).replace(/</g, '&lt;') + '</code></p>');
+  } else if (!window.NOVA_MODULES) {
+    afficherPanne('Le jeu n\'a pas pu démarrer', DOUBLE_CLIC);
+  } else {
+    afficherPanne('Le jeu met anormalement longtemps à démarrer',
+      '<p>Les fichiers se chargent, mais la première image n\'est pas venue. '
+      + 'Le plus souvent, l\'accélération 3D est désactivée dans le navigateur.</p>'
+      + '<p>Vérifiez <code>chrome://gpu</code> (ou l\'équivalent), et essayez un '
+      + 'autre navigateur.</p>');
+  }
+}, 25000);
 </script>
 
-<!-- Reconnaissance d'objets. Scripts CLASSIQUES, donc exécutés avant le module
-     qui suit : `cocoSsd` doit exister quand le jeu s'initialise. Leur absence
-     ici est ce qui affichait « Bibliothèque COCO-SSD absente » — la page avait
-     été écrite sans eux, et rien ne le vérifiait. -->
-<script src="lib/tf.min.js"></script>
-<script src="lib/coco-ssd.min.js"></script>
+<!-- La reconnaissance d'objets n'est PLUS chargée ici.
+     TensorFlow pèse 1,4 Mo et s'initialise en s'enregistrant des moteurs de
+     calcul ; placé devant le jeu, il retardait la première image de plusieurs
+     secondes sur une machine ordinaire — assez pour que le garde-fou conclue à
+     une panne. Or il ne sert qu'à la caméra, que le joueur ouvre quand il veut.
+     Il est donc chargé à la demande, à la première ouverture du scanner :
+     voir js/perception/detecteurs/cocossd.js. -->
+
+<!-- Témoin de support des modules, isolé du jeu. S'il ne s'exécute pas, les
+     modules sont bloqués — et c'est une panne différente d'un jeu qui plante
+     au démarrage. Les confondre, c'est donner au joueur le mauvais remède. -->
+<script type="module">window.NOVA_MODULES = true;</script>
 
 <script type="importmap">
 { "imports": { "three": "./lib/three.module.js" } }
@@ -101,8 +159,23 @@ import { demarrer } from './js/app/partie.js';
 const canvas = document.getElementById('vue');
 canvas.width = innerWidth; canvas.height = innerHeight;
 
-const partie = demarrer(canvas, Number(new URLSearchParams(location.search).get('c') ?? 0));
+let partie;
+try {
+  partie = demarrer(canvas, Number(new URLSearchParams(location.search).get('c') ?? 0));
+} catch (erreur) {
+  // On montre l'erreur RÉELLE. Un message générique renverrait le joueur vers
+  // une cause inventée, et c'est précisément ce qu'il ne faut pas faire.
+  window.NOVA_ERREUR = erreur.message + '\n' + (erreur.stack ?? '').split('\n')[1];
+  document.getElementById('panne-titre').textContent = 'Le jeu a planté au démarrage';
+  document.getElementById('panne-corps').innerHTML =
+    '<p>Le message exact, à me transmettre tel quel :</p><p><code>'
+    + String(window.NOVA_ERREUR).replace(/</g, '&lt;') + '</code></p>';
+  document.getElementById('panne').classList.add('visible');
+  document.getElementById('chargement').classList.add('parti');
+  throw erreur;
+}
 window.NOVA = partie;
+document.getElementById('chargement').classList.add('parti');
 
 const hud = document.getElementById('hud');
 const etat = document.getElementById('etat');

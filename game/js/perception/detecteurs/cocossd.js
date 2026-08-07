@@ -88,8 +88,43 @@ export function traduire(classe) {
  * sinon les poids viennent du dépôt officiel. L'ordre compte : essayer le local
  * d'abord évite d'imposer le réseau à quelqu'un qui a déjà tout ce qu'il faut.
  */
-export async function charger({ cocoSsd = globalThis.cocoSsd, base = '' } = {}) {
-  if (!cocoSsd) throw new Error('Bibliothèque COCO-SSD absente.');
+/**
+ * Injecte un script classique et attend qu'il soit exécuté.
+ *
+ * TensorFlow n'est pas un module ES : il se déclare sur l'objet global. Il faut
+ * donc une vraie balise `<script>`, et attendre son `load` — un `import()` ne
+ * saurait pas le charger.
+ */
+function injecter(url) {
+  return new Promise((resoudre, rejeter) => {
+    const balise = document.createElement('script');
+    balise.src = url;
+    balise.onload = resoudre;
+    balise.onerror = () => rejeter(new Error(`${url} introuvable`));
+    document.head.appendChild(balise);
+  });
+}
+
+/**
+ * Charge la bibliothèque, à la demande.
+ *
+ * Elle pèse 1,4 Mo et s'initialise en enregistrant ses moteurs de calcul.
+ * Placée dans la page avant le jeu, elle retardait la PREMIÈRE IMAGE de
+ * plusieurs secondes — sur une machine ordinaire, assez pour que le garde-fou
+ * de démarrage conclue à une panne et affiche un diagnostic faux. Or elle ne
+ * sert qu'à la caméra, que le joueur ouvre s'il le souhaite et quand il le
+ * souhaite. Rien ne justifiait de la faire attendre à tout le monde.
+ */
+export async function chargerBibliotheque({ base = '' } = {}) {
+  if (globalThis.cocoSsd) return globalThis.cocoSsd;
+  if (!globalThis.tf) await injecter(`${base}lib/tf.min.js`);
+  await injecter(`${base}lib/coco-ssd.min.js`);
+  if (!globalThis.cocoSsd) throw new Error('Bibliothèque COCO-SSD absente.');
+  return globalThis.cocoSsd;
+}
+
+export async function charger({ cocoSsd, base = '' } = {}) {
+  if (!cocoSsd) cocoSsd = await chargerBibliotheque({ base });
   try {
     const local = await fetch(`${base}lib/model/model.json`, { method: 'HEAD' });
     if (!local.ok) throw new Error('pas de modèle local');

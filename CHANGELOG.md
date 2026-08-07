@@ -23,6 +23,23 @@ Versionnement [SemVer](https://semver.org/lang/fr/).
   16 tests ; mutation, 9 sur 9 après réécriture de deux tests non discriminants.
 
 ### Corrigé
+- **« Le jeu n'a pas pu démarrer » sur un jeu qui démarrait** (B-034) : le
+  garde-fou concluait au double-clic si `window.NOVA` manquait après 2,5 s. Le
+  jeu a depuis gagné 1,4 Mo de TensorFlow, 1,3 Mo de three.js et dix-neuf
+  modèles, et ce délai n'a jamais été revu : le joueur recevait un diagnostic
+  **faux**, qui l'envoyait corriger une erreur qu'il n'avait pas commise.
+  C'est le défaut déjà corrigé dans le lanceur Windows, réapparu ailleurs — un
+  message sûr de lui qui remplace le vrai. Le garde-fou ne conclut plus d'un
+  délai mais de PREUVES : un témoin de module distinct du jeu sépare
+  « les modules sont bloqués » de « le jeu a planté », les erreurs réelles sont
+  affichées telles quelles, et le délai n'est qu'un dernier recours à 25 s.
+- **TensorFlow retardait la première image** (B-035) : chargé dans la page avant
+  le jeu, il s'initialisait en enregistrant ses moteurs de calcul et repoussait
+  l'affichage de plusieurs secondes. Or il ne sert qu'à la caméra, que le joueur
+  ouvre s'il le veut et quand il le veut : rien ne justifiait de le faire
+  attendre à tout le monde. Il est désormais injecté à la première ouverture du
+  scanner. Un écran de chargement remplace en outre le noir muet, qui se lisait
+  lui-même comme une panne.
 - **De l'herbe poussait dans le vide** (B-031) : signalé par le joueur. Le lierre
   de la serre était déclaré sur toute la profondeur de la pièce, et cette pièce a
   un gouffre : des touffes flottaient au-dessus de trois mètres de rien.
@@ -285,6 +302,23 @@ Versionnement [SemVer](https://semver.org/lang/fr/).
 - Lumières : 25 sources → pool de 6 suivant le joueur, coût de shader constant.
 
 ### Corrigé
+- **« Le jeu n'a pas pu démarrer » sur un jeu qui démarrait** (B-034) : le
+  garde-fou concluait au double-clic si `window.NOVA` manquait après 2,5 s. Le
+  jeu a depuis gagné 1,4 Mo de TensorFlow, 1,3 Mo de three.js et dix-neuf
+  modèles, et ce délai n'a jamais été revu : le joueur recevait un diagnostic
+  **faux**, qui l'envoyait corriger une erreur qu'il n'avait pas commise.
+  C'est le défaut déjà corrigé dans le lanceur Windows, réapparu ailleurs — un
+  message sûr de lui qui remplace le vrai. Le garde-fou ne conclut plus d'un
+  délai mais de PREUVES : un témoin de module distinct du jeu sépare
+  « les modules sont bloqués » de « le jeu a planté », les erreurs réelles sont
+  affichées telles quelles, et le délai n'est qu'un dernier recours à 25 s.
+- **TensorFlow retardait la première image** (B-035) : chargé dans la page avant
+  le jeu, il s'initialisait en enregistrant ses moteurs de calcul et repoussait
+  l'affichage de plusieurs secondes. Or il ne sert qu'à la caméra, que le joueur
+  ouvre s'il le veut et quand il le veut : rien ne justifiait de le faire
+  attendre à tout le monde. Il est désormais injecté à la première ouverture du
+  scanner. Un écran de chargement remplace en outre le noir muet, qui se lisait
+  lui-même comme une panne.
 - **Les bornes paraissaient rouges sous la floraison** (B-030) : le témoin d'un
   socle couvrait presque tout le socle — un mètre de côté de pure émission. Le
   halo débordait sur les bornes en métal sombre situées à un mètre de là. Ce
