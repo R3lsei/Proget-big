@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>NOVA-7 — chambres</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0b0d0e; overflow: hidden;
+               font: 15px/1.5 system-ui, sans-serif; color: #eef3f4; }
+  canvas { display: block; width: 100vw; height: 100vh; }
+  #hud { position: fixed; inset: auto auto 1.5rem 50%; transform: translateX(-50%);
+         background: rgba(12,16,18,.78); padding: .6rem 1.1rem; border-radius: .4rem;
+         text-align: center; pointer-events: none; }
+  #aide { position: fixed; top: 1.2rem; left: 1.2rem; background: rgba(12,16,18,.78);
+          padding: .7rem 1rem; border-radius: .4rem; border-left: 3px solid #45d19a; }
+  #aide b { color: #45d19a; font-weight: 600; }
+  #mire { position: fixed; left: 50%; top: 50%; width: 8px; height: 8px;
+          margin: -4px 0 0 -4px; border: 1px solid rgba(255,255,255,.75);
+          border-radius: 50%; pointer-events: none; }
+  #etat { position: fixed; top: 1.2rem; right: 1.2rem; background: rgba(12,16,18,.78);
+          padding: .7rem 1rem; border-radius: .4rem; font-variant-numeric: tabular-nums; }
+  .ouverte { color: #45d19a; } .fermee { color: #ff7a5c; }
+  #scanner { position: fixed; right: 1.2rem; bottom: 1.2rem; width: 320px;
+             background: rgba(12,16,18,.9); border-radius: .5rem; padding: .8rem;
+             border-left: 3px solid #45d19a; display: none; }
+  #scanner.ouvert { display: block; }
+  #scan-video { width: 100%; border-radius: .3rem; background: #000; display: block; }
+  #scan-etat { margin-top: .5rem; min-height: 2.4em; }
+  #sacoche { position: fixed; left: 1.2rem; bottom: 1.2rem;
+             background: rgba(12,16,18,.85); border-radius: .5rem; padding: .7rem 1rem;
+             max-width: 300px; }
+  #sacoche ol { margin: .4rem 0 0; padding-left: 1.4rem; }
+  #sacoche li { cursor: default; }
+  #sacoche .vide { opacity: .6; font-style: italic; }
+  kbd { background: #263034; border-radius: .2rem; padding: 0 .35rem;
+        font: inherit; font-size: .9em; color: #9fe8cd; }
+  #panne { position: fixed; inset: 0; display: none; place-content: center;
+           background: #0b0d0e; padding: 2rem; }
+  #panne.visible { display: grid; }
+  #panne div { max-width: 34rem; margin: auto; border-left: 3px solid #ff7a5c;
+               background: #12181a; padding: 1.4rem 1.8rem; border-radius: .4rem; }
+  #panne h1 { margin: 0 0 .8rem; font-size: 1.2rem; color: #ff9d85; }
+  #panne code { background: #263034; padding: .1rem .4rem; border-radius: .2rem; }
+  #panne p { margin: .7rem 0; }
+  /* Cinématique. Trois calques, et aucun n'intercepte la souris : passer la
+     séquence doit marcher au clic comme au clavier, et un calque qui capte les
+     événements bloquerait exactement ce qu'il faut pouvoir interrompre. */
+  #voile { position: fixed; inset: 0; background: #000; opacity: 0;
+           pointer-events: none; }
+  #eclair { position: fixed; inset: 0; background: #eaf6ff; opacity: 0;
+            pointer-events: none; }
+  #carton { position: fixed; inset: auto 0 22% 0; text-align: center;
+            font-size: 1.5rem; letter-spacing: .32em; color: #f2f6f7;
+            text-shadow: 0 2px 18px rgba(0,0,0,.9); pointer-events: none;
+            opacity: 0; transition: opacity .35s; }
+  #carton.visible { opacity: 1; }
+  #chargement { position: fixed; inset: 0; display: grid; place-content: center;
+                background: #0b0d0e; color: #9fe8cd; letter-spacing: .04em; }
+  #chargement.parti { display: none; }
+</style>
+</head>
+<body>
+<canvas id="vue"></canvas>
+<div id="mire"></div>
+<div id="aide">
+  <b>ZQSD</b> se déplacer · <b>souris</b> regarder · <b>espace</b> sauter<br>
+  <b>E</b> prendre / poser · <b>C</b> caméra · <b>clic</b> capturer la souris
+</div>
+<div id="etat"></div>
+<div id="hud">Cliquez pour commencer.</div>
+<div id="voile"></div>
+<div id="eclair"></div>
+<div id="carton"></div>
+
+<div id="scanner">
+  <video id="scan-video" autoplay playsinline muted></video>
+  <div id="scan-etat">Caméra éteinte.</div>
+</div>
+
+<div id="sacoche">
+  <b>Sacoche</b> — <kbd>C</kbd> scanner · <kbd>1</kbd>…<kbd>9</kbd> invoquer
+  <div id="sacoche-liste" class="vide">Rien de mémorisé.</div>
+</div>
+
+<div id="panne"><div>
+  <h1 id="panne-titre"></h1>
+  <div id="panne-corps"></div>
+</div></div>
+
+<!-- Le joueur doit voir que quelque chose se passe. Trois mégaoctets se
+     chargent avant la première image ; un écran noir muet pendant ce temps se
+     lit comme une panne, et c'est ce qui a fait croire à un jeu cassé. -->
+<div id="chargement">Chargement du complexe…</div>
+
+<script>
+// Volontairement un script CLASSIQUE, pas un module : si les modules sont
+// bloqués, c'est justement lui qui doit encore s'exécuter pour le dire.
+// Un écran noir muet ne renseigne personne.
+//
+// ─── Ce qui a mal tourné, et la leçon ────────────────────────────────────────
+// La première version se contentait de « pas de window.NOVA après 2,5 s » pour
+// conclure au double-clic. Puis le jeu a gagné 1,4 Mo de TensorFlow, 1,3 Mo de
+// three.js et dix-neuf modèles — et le délai n'a jamais été revu. Sur une
+// machine ordinaire le chargement dépasse 2,5 s, et le joueur recevait un
+// diagnostic FAUX : on lui expliquait qu'il avait double-cliqué alors qu'il
+// avait lancé le jeu correctement.
+//
+// C'est exactement le défaut déjà corrigé dans le lanceur Windows, réapparu
+// ailleurs : un message d'erreur sûr de lui qui remplace le vrai. On ne
+// conclut donc plus d'un délai, mais de PREUVES — les modules se sont-ils
+// exécutés, une erreur a-t-elle été levée — et le délai n'est plus qu'un
+// dernier recours, largement dimensionné.
+
+window.NOVA_ERREUR = null;
+addEventListener('error', function (e) {
+  window.NOVA_ERREUR = e.message + (e.filename ? '\n' + e.filename + ':' + e.lineno : '');
+});
+addEventListener('unhandledrejection', function (e) {
+  window.NOVA_ERREUR = 'Promesse rejetée : ' + ((e.reason && e.reason.message) || e.reason);
+});
+
+function afficherPanne(titre, corps) {
+  var panne = document.getElementById('panne');
+  document.getElementById('panne-titre').textContent = titre;
+  document.getElementById('panne-corps').innerHTML = corps;
+  panne.classList.add('visible');
+}
+
+var DOUBLE_CLIC =
+  '<p><b>Vous avez probablement ouvert ce fichier par double-clic.</b> Les '
+  + 'navigateurs interdisent à une page ouverte depuis le disque de charger ses '
+  + 'propres modules — et la caméra exige de toute façon une adresse '
+  + '<code>localhost</code>.</p>'
+  + '<p>Lancez plutôt, à la racine du projet :</p>'
+  + '<p><code>JOUER-LES-CHAMBRES-Windows.bat</code> (ou <code>.command</code> sur Mac/Linux)</p>'
+  + '<p>En ligne de commande : <code>python jouer.py</code></p>';
+
+setTimeout(function () {
+  if (window.NOVA) return;
+  if (window.NOVA_ERREUR) {
+    afficherPanne('Le jeu a rencontré une erreur',
+      '<p>Le message exact, à me transmettre tel quel :</p>'
+      + '<p><code>' + String(window.NOVA_ERREUR).replace(/</g, '&lt;') + '</code></p>');
+  } else if (!window.NOVA_MODULES) {
+    afficherPanne('Le jeu n\'a pas pu démarrer', DOUBLE_CLIC);
+  } else {
+    afficherPanne('Le jeu met anormalement longtemps à démarrer',
+      '<p>Les fichiers se chargent, mais la première image n\'est pas venue. '
+      + 'Le plus souvent, l\'accélération 3D est désactivée dans le navigateur.</p>'
+      + '<p>Vérifiez <code>chrome://gpu</code> (ou l\'équivalent), et essayez un '
+      + 'autre navigateur.</p>');
+  }
+}, 25000);
+</script>
+
+<!-- La reconnaissance d'objets n'est PLUS chargée ici.
+     TensorFlow pèse 1,4 Mo et s'initialise en s'enregistrant des moteurs de
+     calcul ; placé devant le jeu, il retardait la première image de plusieurs
+     secondes sur une machine ordinaire — assez pour que le garde-fou conclue à
+     une panne. Or il ne sert qu'à la caméra, que le joueur ouvre quand il veut.
+     Il est donc chargé à la demande, à la première ouverture du scanner :
+     voir js/perception/detecteurs/cocossd.js. -->
+
+<!-- Témoin de support des modules, isolé du jeu. S'il ne s'exécute pas, les
+     modules sont bloqués — et c'est une panne différente d'un jeu qui plante
+     au démarrage. Les confondre, c'est donner au joueur le mauvais remède. -->
+<script type="module">window.NOVA_MODULES = true;</script>
+
+<script type="importmap">
+{ "imports": { "three": "./lib/three.module.js" } }
+</script>
+<script type="module">
+import { demarrer } from './js/app/partie.js';
+
+const canvas = document.getElementById('vue');
+canvas.width = innerWidth; canvas.height = innerHeight;
+
+let partie;
+try {
+  partie = demarrer(canvas, Number(new URLSearchParams(location.search).get('c') ?? 0));
+} catch (erreur) {
+  // On montre l'erreur RÉELLE. Un message générique renverrait le joueur vers
+  // une cause inventée, et c'est précisément ce qu'il ne faut pas faire.
+  window.NOVA_ERREUR = erreur.message + '\n' + (erreur.stack ?? '').split('\n')[1];
+  document.getElementById('panne-titre').textContent = 'Le jeu a planté au démarrage';
+  document.getElementById('panne-corps').innerHTML =
+    '<p>Le message exact, à me transmettre tel quel :</p><p><code>'
+    + String(window.NOVA_ERREUR).replace(/</g, '&lt;') + '</code></p>';
+  document.getElementById('panne').classList.add('visible');
+  document.getElementById('chargement').classList.add('parti');
+  throw erreur;
+}
+window.NOVA = partie;
+document.getElementById('chargement').classList.add('parti');
+
+const hud = document.getElementById('hud');
+const etat = document.getElementById('etat');
+
+// ─── Cinématique ────────────────────────────────────────────────────────────
+//
+// La partie ne connaît pas le DOM : elle appelle ce rappel avec ce qu'il faut
+// afficher, et c'est tout. Le calcul de la trajectoire, lui, est une fonction
+// pure vérifiée sous Node — c'est le même partage que pour les consignes, et
+// c'est ce qui permet de tester une caméra sans navigateur.
+const voile = document.getElementById('voile');
+const eclair = document.getElementById('eclair');
+const carton = document.getElementById('carton');
+partie.surCinematique = (vue) => {
+  voile.style.opacity = vue.voile;
+  eclair.style.opacity = vue.eclair;
+  carton.textContent = vue.texte;
+  carton.classList.toggle('visible', Boolean(vue.texte));
+};
+// Le clic passe la séquence, au même titre que n'importe quelle touche. Il est
+// posé AVANT la capture du pointeur : un joueur qui clique pour reprendre la
+// main ne doit pas avoir à cliquer deux fois.
+addEventListener('mousedown', () => partie.passerCinematique?.());
+
+// ─── Caméra ─────────────────────────────────────────────────────────────────
+const panneau = document.getElementById('scanner');
+const video = document.getElementById('scan-video');
+const scanEtat = document.getElementById('scan-etat');
+const liste = document.getElementById('sacoche-liste');
+let analyse = 0;
+
+async function basculerScanner() {
+  if (panneau.classList.contains('ouvert')) {
+    partie.fermerScanner(video);
+    panneau.classList.remove('ouvert');
+    clearInterval(analyse);
+    scanEtat.textContent = 'Caméra éteinte.';
+    return;
+  }
+  panneau.classList.add('ouvert');
+  scanEtat.textContent = 'Ouverture…';
+  const resultat = await partie.ouvrirScanner(video);
+  if (!resultat.ok) { scanEtat.textContent = partie.dernierMessage; return; }
+  // Une analyse toutes les 350 ms : assez pour paraître vivant, assez espacé
+  // pour que le détecteur ne mange pas le temps du rendu.
+  analyse = setInterval(async () => {
+    const vu = await partie.analyser(video);
+    scanEtat.textContent = {
+      rien: 'Rien de reconnu. Approchez l\'objet.',
+      hesite: `${vu.nom} ? Maintenez-le en place…`,
+      memorise: `${vu.nom} mémorisé.`,
+      connu: `${vu.nom} — déjà dans la sacoche.`,
+      inactif: 'Caméra éteinte.',
+    }[vu.etat];
+    majSacoche();
+  }, 350);
+}
+
+function majSacoche() {
+  const { connus, places } = partie.inventaireVisible();
+  if (!connus.length) {
+    liste.className = 'vide';
+    liste.textContent = 'Rien de mémorisé.';
+    return;
+  }
+  liste.className = '';
+  liste.innerHTML = '<ol>' + connus.map((nom, i) =>
+    `<li><kbd>${i + 1}</kbd> ${nom}</li>`).join('') + '</ol>'
+    + `<div style="opacity:.7;margin-top:.3rem">${places} place(s) disponible(s)</div>`;
+}
+
+addEventListener('keydown', (e) => {
+  if (e.code === 'KeyC') { basculerScanner(); return; }
+  const chiffre = Number(e.key);
+  if (chiffre >= 1 && chiffre <= 9) {
+    const { connus } = partie.inventaireVisible();
+    const nom = connus[chiffre - 1];
+    if (nom) { partie.invoquer(nom); majSacoche(); }
+  }
+});
+
+setInterval(() => {
+  hud.textContent = partie.dernierMessage
+    || (partie.vise ? `E — prendre ${partie.vise}` : 'Cliquez pour capturer la souris.');
+  etat.innerHTML = `${partie.chambre.titre}<br>`
+    + `mécanismes actifs : ${partie.actifs.size} / ${partie.bati.receptacles.size}<br>`
+    + `<span class="${partie.ouverte ? 'ouverte' : 'fermee'}">`
+    + `porte ${partie.ouverte ? 'ouverte' : 'fermée'}</span>`;
+}, 120);
+
+addEventListener('resize', () => {
+  canvas.width = innerWidth; canvas.height = innerHeight;
+  // Une seule fonction : le renderer, la caméra ET la chaîne de post-traitement
+  // doivent changer de taille ensemble. En oublier une décale le halo du reste
+  // de l'image, et l'oubli ne se voit qu'après un redimensionnement.
+  partie.redimensionner(innerWidth, innerHeight);
+});
+</script>
+</body>
+</html>

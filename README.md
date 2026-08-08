@@ -1,8 +1,51 @@
-# Proget-big — Software Integrations Hub
+# Proget-big
 
-A small hub for connecting Claude/CLI workflows to external software, built one
-integration at a time. First integration: **Tripo3D** (AI text-to-3D and
-image-to-3D generation).
+Ce dépôt contient **NOVA-7**, un jeu d'énigmes à la première personne où le
+joueur résout les obstacles en montrant de vrais objets de son domicile à sa
+webcam — le jeu les reconnaît, en déduit les propriétés physiques, et en dérive
+ce qu'ils permettent de faire.
+
+> **État : conception validée, jalon 0 en cours.**
+> Le développement est bloqué tant que le banc de mesure de détection n'a pas
+> été exécuté — voir [docs/TASKS.md](docs/TASKS.md).
+
+## Documentation
+
+Tout part de **[docs/README.md](docs/README.md)**.
+Les quatre documents qui font autorité : [SPEC](docs/SPEC.md) ·
+[GAMEPLAY](docs/GAMEPLAY.md) · [ARCHITECTURE](docs/ARCHITECTURE.md) ·
+[BALANCING](docs/BALANCING.md).
+
+## Lancer le jeu
+
+Double-cliquez sur `JOUER-Windows.bat` (ou `JOUER-Mac-Linux.command`), ou :
+
+```bash
+python serve.py          # sert le jeu et ouvre le navigateur
+```
+
+La caméra exige `http://localhost` : ouvrir `index.html` directement ne
+fonctionnera pas, c'est une règle de sécurité des navigateurs.
+
+## Doubler les voix (optionnel)
+
+Double-cliquez sur `INSTALLER-LES-VOIX-Windows.bat`, ou consultez
+[game/README.md](game/README.md).
+
+## Le banc de mesure
+
+```bash
+cd tools/spike-detection && python3 -m http.server 8000
+```
+
+Mesure sur votre machine la latence de la détection open-vocabulary. Ses
+résultats conditionnent le design du scanner.
+
+---
+
+# Intégrations
+
+Le dépôt sert aussi de hub d'intégrations logicielles, utilisées par le jeu.
 
 ## Setup
 
@@ -22,6 +65,12 @@ python cli.py tripo text "a low-poly red fox" --output ./output
 
 # Generate a 3D model from an image
 python cli.py tripo image ./cat.png --output ./output
+
+# List ElevenLabs voices, then voice the NOVA-7 game dialogue
+python cli.py elevenlabs list
+python cli.py elevenlabs voices --dry-run   # preview, spends no credits
+python cli.py elevenlabs voices             # writes game/voices/*.mp3
+python cli.py elevenlabs say "Bonjour" --output ./output
 ```
 
 Generated files (`.glb` model, and PBR variant when available) are downloaded

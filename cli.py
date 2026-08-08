@@ -3,15 +3,27 @@
 Usage:
     python cli.py tripo text "a low-poly fox" --output ./output
     python cli.py tripo image ./cat.png --output ./output
+
+    python cli.py elevenlabs voices                 # doubler tout le jeu (avec clé API)
+    python cli.py elevenlabs voices --dry-run       # lister sans dépenser
+    python cli.py elevenlabs list                   # voix disponibles
+    python cli.py elevenlabs say "Bonjour Sujet 23" # une seule réplique
+
+    # Sans clé API : téléchargez les répliques à la main sur elevenlabs.io,
+    # puis importez-les d'un coup.
+    python cli.py elevenlabs script                 # affiche les répliques numérotées
+    python cli.py elevenlabs import ./mes_voix       # importe un dossier de fichiers
 """
 
 import argparse
 import asyncio
 import sys
 
-from dotenv import load_dotenv
-
-from integrations.tripo import TripoError, generate_from_image, generate_from_text
+try:
+    from dotenv import load_dotenv
+except ImportError:  # dépendance facultative
+    def load_dotenv() -> None:
+        pass
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -30,6 +42,31 @@ def build_parser() -> argparse.ArgumentParser:
     image_parser.add_argument("image_path")
     image_parser.add_argument("--output", default="./output")
 
+    el = subparsers.add_parser("elevenlabs", help="Text-to-speech with ElevenLabs")
+    el_sub = el.add_subparsers(dest="mode", required=True)
+
+    voices = el_sub.add_parser("voices", help="Voice the NOVA-7 game dialogue")
+    voices.add_argument("--output", default="./game/voices")
+    voices.add_argument("--voice", default=None, help="ElevenLabs voice_id")
+    voices.add_argument("--overwrite", action="store_true", help="re-synthesise cached lines")
+    voices.add_argument("--from-json", default=None,
+                        help="lines exported by NOVA.spokenLines() in the browser console")
+    voices.add_argument("--dry-run", action="store_true", help="list without spending credits")
+
+    el_sub.add_parser("list", help="List the voices available on your account")
+
+    say = el_sub.add_parser("say", help="Synthesise a single line")
+    say.add_argument("text")
+    say.add_argument("--output", default="./output")
+    say.add_argument("--voice", default=None)
+
+    el_sub.add_parser("script", help="Print the numbered lines to record/download manually")
+
+    imp = el_sub.add_parser("import", help="Import manually downloaded audio files")
+    imp.add_argument("folder", help="folder containing 01.mp3, 02.mp3, ...")
+    imp.add_argument("--output", default="./game/voices")
+    imp.add_argument("--move", action="store_true", help="move instead of copy")
+
     return parser
 
 
@@ -37,15 +74,22 @@ def main() -> None:
     load_dotenv()
     args = build_parser().parse_args()
 
+    if args.command == "tripo":
+        run_tripo(args)
+    elif args.command == "elevenlabs":
+        run_elevenlabs(args)
+
+
+def run_tripo(args) -> None:
+    from integrations.tripo import TripoError, generate_from_image, generate_from_text
+
     try:
-        if args.command == "tripo" and args.mode == "text":
+        if args.mode == "text":
             files = asyncio.run(
                 generate_from_text(args.prompt, args.output, negative_prompt=args.negative_prompt)
             )
-        elif args.command == "tripo" and args.mode == "image":
-            files = asyncio.run(generate_from_image(args.image_path, args.output))
         else:
-            raise TripoError("Unknown command")
+            files = asyncio.run(generate_from_image(args.image_path, args.output))
     except TripoError as exc:
         print(f"Error: {exc}", file=sys.stderr)
         sys.exit(1)
@@ -54,6 +98,43 @@ def main() -> None:
     for model_type, path in files.items():
         if path:
             print(f"  {model_type}: {path}")
+
+
+def run_elevenlabs(args) -> None:
+    from integrations.elevenlabs import ElevenLabsError, list_voices, synthesize
+    from integrations.elevenlabs.generate import generate_game_voices, import_folder, print_script
+
+    # "script" et "import" ne touchent jamais l'API : pas besoin de clé.
+    if args.mode == "script":
+        print_script()
+        return
+    if args.mode == "import":
+        try:
+            import_folder(args.folder, output_dir=args.output, move=args.move)
+        except ElevenLabsError as exc:
+            print(f"Error: {exc}", file=sys.stderr)
+            sys.exit(1)
+        return
+
+    try:
+        if args.mode == "voices":
+            generate_game_voices(
+                output_dir=args.output,
+                voice_id=args.voice,
+                overwrite=args.overwrite,
+                from_json=args.from_json,
+                dry_run=args.dry_run,
+            )
+        elif args.mode == "list":
+            for v in list_voices():
+                labels = ", ".join(f"{k}={x}" for k, x in v["labels"].items()) or "—"
+                print(f"  {v['voice_id']}  {v['name']:<24} {labels}")
+        elif args.mode == "say":
+            path = synthesize(args.text, args.output, voice_id=args.voice, overwrite=True)
+            print(f"Écrit : {path}")
+    except ElevenLabsError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        sys.exit(1)
 
 
 if __name__ == "__main__":

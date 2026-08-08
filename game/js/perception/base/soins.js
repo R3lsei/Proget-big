@@ -1,0 +1,46 @@
+// Hygiène, soins, pharmacie, produits d'entretien.
+//
+// Catégorie riche en `contient_liquide` et en `inflammable` — donc en solutions
+// pour éteindre, dissoudre ou mettre le feu. C'est aussi celle qui contient le
+// plus d'objets fins et rigides détournables en crochet.
+
+export const SOINS = {
+  'brosse à dents':    { a: 'une', p: ['rigide', 'allonge', 'mince', 'inflammable', 'leger', 'tenable_une_main'] },
+  'dentifrice':        { a: 'du',  p: ['souple', 'allonge', 'creux', 'odorant', 'tenable_une_main'] },
+  'peigne':            { a: 'un',  p: ['rigide', 'plat', 'mince', 'pointu', 'inflammable', 'leger', 'tenable_une_main'] },
+  'brosse à cheveux':  { a: 'une', p: ['rigide', 'allonge', 'pointu', 'inflammable', 'tenable_une_main'] },
+  'rasoir':            { a: 'un',  p: ['tranchant', 'rigide', 'allonge', 'mince', 'conducteur', 'leger', 'tenable_une_main'] },
+  'coupe-ongles':      { a: 'un',  p: ['tranchant', 'rigide', 'conducteur', 'magnetique', 'leger', 'tenable_une_main'] },
+  'pince à épiler':    { a: 'une', p: ['pointu', 'rigide', 'allonge', 'mince', 'conducteur', 'magnetique', 'leger', 'tenable_une_main'] },
+  'lime à ongles':     { a: 'une', p: ['rigide', 'plat', 'allonge', 'mince', 'leger', 'tenable_une_main'] },
+  'savon':             { a: 'du',  p: ['rigide', 'odorant', 'leger', 'tenable_une_main'] },
+  'gel douche':        { a: 'du',  p: ['souple', 'creux', 'contient_liquide', 'odorant', 'tenable_une_main'] },
+  'shampoing':        { a: 'du',  p: ['souple', 'creux', 'contient_liquide', 'odorant', 'tenable_une_main'] },
+  'parfum':            { a: 'du',  p: ['cassant', 'creux', 'contient_liquide', 'odorant', 'inflammable', 'leger', 'tenable_une_main'] },
+  'déodorant':         { a: 'un',  p: ['rigide', 'creux', 'allonge', 'contient_liquide', 'odorant', 'inflammable', 'conducteur', 'tenable_une_main'] },
+  'crème':             { a: 'de la', p: ['souple', 'creux', 'odorant', 'tenable_une_main'] },
+  'papier toilette':   { a: 'du',  p: ['souple', 'absorbant', 'inflammable', 'leger'] },
+  'mouchoir':          { a: 'un',  p: ['souple', 'plat', 'mince', 'absorbant', 'inflammable', 'leger'] },
+  'coton':             { a: 'du',  p: ['souple', 'absorbant', 'inflammable', 'leger'] },
+  'coton-tige':        { a: 'un',  p: ['allonge', 'mince', 'souple', 'absorbant', 'inflammable', 'leger'] },
+  'pansement':         { a: 'un',  p: ['souple', 'plat', 'mince', 'absorbant', 'leger'] },
+  'bandage':           { a: 'un',  p: ['souple', 'allonge', 'absorbant', 'inflammable', 'leger'], syn: ['bande de gaze'] },
+  'compresse':         { a: 'une', p: ['souple', 'plat', 'absorbant', 'inflammable', 'leger'] },
+  'seringue':          { a: 'une', p: ['pointu', 'rigide', 'allonge', 'mince', 'creux', 'contient_liquide', 'leger', 'tenable_une_main'] },
+  'thermomètre':       { a: 'un',  p: ['rigide', 'allonge', 'mince', 'electronique', 'alimente', 'porte_texte', 'cassant', 'leger', 'tenable_une_main'] },
+  'médicament':        { a: 'un',  p: ['rigide', 'comestible', 'porte_texte', 'leger', 'tenable_une_main'], syn: ['cachet', 'comprimé'] },
+  'boîte de médicaments': { a: 'une', p: ['rigide', 'creux', 'porte_texte', 'inflammable', 'leger', 'tenable_une_main'] },
+  'sirop':             { a: 'du',  p: ['creux', 'cassant', 'contient_liquide', 'comestible', 'odorant', 'porte_texte', 'tenable_une_main'] },
+  'alcool désinfectant': { a: 'de l\'', p: ['contient_liquide', 'odorant', 'inflammable', 'porte_texte'] },
+  'eau oxygénée':      { a: 'de l\'', p: ['contient_liquide', 'porte_texte'] },
+  'javel':             { a: 'de la', p: ['contient_liquide', 'odorant', 'porte_texte'] },
+  'produit vaisselle': { a: 'du',  p: ['souple', 'creux', 'contient_liquide', 'odorant', 'porte_texte', 'tenable_une_main'] },
+  'lingette':          { a: 'une', p: ['souple', 'plat', 'absorbant', 'odorant', 'inflammable', 'leger'] },
+  'balai':             { a: 'un',  p: ['rigide', 'allonge', 'inflammable'] },
+  'serpillière':       { a: 'une', p: ['souple', 'plat', 'absorbant', 'inflammable'] },
+  'brosse':            { a: 'une', p: ['rigide', 'allonge', 'inflammable', 'tenable_une_main'] },
+  'gant de toilette':  { a: 'un',  p: ['souple', 'creux', 'absorbant', 'inflammable', 'leger'] },
+  'miroir de poche':   { a: 'un',  p: ['plat', 'mince', 'cassant', 'reflechissant', 'leger', 'tenable_une_main'] },
+  'sèche-cheveux':     { a: 'un',  p: ['rigide', 'electronique', 'emet_son', 'conducteur', 'tenable_une_main'] },
+  'bouillotte':        { a: 'une', p: ['souple', 'creux', 'contient_liquide', 'isolant_thermique', 'tenable_une_main'] },
+};

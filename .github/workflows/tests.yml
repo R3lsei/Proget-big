@@ -1,0 +1,50 @@
+# Barrière de qualité : aucun commit ne passe si les tests échouent.
+# TEST_PLAN.md définit ce qui est vérifié et pourquoi.
+
+name: Tests
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+jobs:
+  javascript:
+    name: Tests JavaScript
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      # Aucun `npm install` : le harnais n'a délibérément aucune dépendance.
+      # three est résolu vers la copie vendorée du jeu — on teste exactement
+      # la version que le joueur exécute.
+      - name: Exécuter les tests
+        run: npm test
+
+      # Une salle impossible ne plante pas et ne lève rien : elle se découvre
+      # après des heures de jeu perdues. Elle doit donc bloquer comme un test.
+      - name: Vérifier la résolubilité des salles
+        run: npm run verifier
+
+      # Le jeu peut être juste et rester injouable : trois livraisons de suite
+      # ont échoué au LANCEMENT — écran gris, page 404, Python absent — pendant
+      # que les 296 tests passaient. Personne ne le voyait avant le joueur.
+      # Les deux serveurs sont ici démarrés pour de vrai, puis interrogés.
+      # `pwsh` est préinstallé sur les exécuteurs ubuntu-latest.
+      - name: Vérifier que le jeu démarre
+        run: npm run lancement
+
+  python:
+    name: Tests Python
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Installer les dépendances
+        run: pip install -r requirements.txt
+      - name: Exécuter les tests
+        run: python -m unittest discover tests -v

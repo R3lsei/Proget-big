@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NOVA-7 : Protocole Évasion</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔬</text></svg>">
+<link rel="stylesheet" href="css/style.css">
+<script type="importmap">
+{
+  "imports": {
+    "three": "./lib/three.module.js"
+  }
+}
+</script>
+<script src="lib/tf.min.js"></script>
+<script src="lib/coco-ssd.min.js"></script>
+</head>
+<body>
+
+<!-- ========== ÉCRAN TITRE ========== -->
+<div id="menu" class="overlay visible">
+  <div class="menu-inner">
+    <div class="menu-logo">NOVA<span>-7</span></div>
+    <div class="menu-subtitle">PROTOCOLE ÉVASION</div>
+    <p class="menu-story">
+      Vous vous réveillez dans une cellule du complexe souterrain NOVA-7,
+      poignets liés, mémoire effacée. Vous êtes le <b>Sujet&nbsp;23</b>.<br><br>
+      Votre seul avantage&nbsp;: une faille dans le système de contrôle neural
+      vous permet de <b>matérialiser dans la simulation les objets réels</b>
+      que vous montrez à votre caméra. Une paire de ciseaux, un téléphone,
+      un livre… tout ce que la machine reconnaît devient une arme pour votre évasion.
+    </p>
+    <div class="menu-controls">
+      <div><kbd>Z</kbd><kbd>Q</kbd><kbd>S</kbd><kbd>D</kbd> se déplacer</div>
+      <div><kbd>Souris</kbd> regarder</div>
+      <div><kbd>Espace</kbd> sauter</div>
+      <div><kbd>E</kbd> interagir</div>
+      <div><kbd>C</kbd> scanner un objet réel</div>
+      <div><kbd>Tab</kbd> inventaire</div>
+      <div><kbd>F</kbd> lampe (si téléphone scanné)</div>
+    </div>
+    <button id="btn-start" disabled>CHARGEMENT DU MODULE NEURAL…</button>
+    <div id="load-status">Initialisation de l'IA de reconnaissance…</div>
+  </div>
+</div>
+
+<!-- ========== HUD ========== -->
+<div id="hud" class="hidden">
+  <div id="crosshair">+</div>
+  <div id="objective-box">
+    <div class="obj-title">OBJECTIF</div>
+    <div id="objective-text">…</div>
+  </div>
+  <div id="chapter-banner" class="hidden"></div>
+  <div id="interact-prompt" class="hidden"></div>
+  <div id="subtitles" class="hidden"></div>
+  <div id="notif-stack"></div>
+  <div id="hotbar"></div>
+  <div id="vignette"></div>
+  <div id="damage-flash"></div>
+</div>
+
+<!-- ========== SCANNER (CAMÉRA RÉELLE) ========== -->
+<div id="scanner" class="overlay hidden">
+  <div class="scan-frame">
+    <div class="scan-header">
+      <span class="rec-dot"></span> LIAISON OPTIQUE NEURALE — montrez un objet à la caméra
+    </div>
+    <div class="video-wrap">
+      <video id="scan-video" autoplay playsinline muted></video>
+      <canvas id="scan-canvas"></canvas>
+      <div class="scan-line"></div>
+    </div>
+    <div id="scan-result">
+      <div id="scan-result-name">Recherche d'objets…</div>
+      <div id="scan-result-caps"></div>
+    </div>
+    <div class="scan-actions">
+      <button id="btn-capture" disabled>MATÉRIALISER L'OBJET [Entrée]</button>
+      <button id="btn-close-scan">FERMER [C]</button>
+    </div>
+  </div>
+</div>
+
+<!-- ========== INVENTAIRE ========== -->
+<div id="inventory" class="overlay hidden">
+  <div class="inv-frame">
+    <div class="inv-header">INVENTAIRE — OBJETS MATÉRIALISÉS</div>
+    <div id="inv-grid"></div>
+    <div class="inv-hint">Les objets sont utilisés automatiquement quand vous interagissez avec un obstacle compatible. <kbd>Tab</kbd> pour fermer.</div>
+  </div>
+</div>
+
+<!-- ========== CLAVIER À CODE ========== -->
+<div id="keypad" class="overlay hidden">
+  <div class="pad-frame">
+    <div class="pad-header">PORTE SÉCURISÉE — BLOC A</div>
+    <div id="pad-hint">Entrez le code à 4 chiffres.</div>
+    <div id="pad-display">····</div>
+    <div class="pad-grid">
+      <button data-d="1">1</button><button data-d="2">2</button><button data-d="3">3</button>
+      <button data-d="4">4</button><button data-d="5">5</button><button data-d="6">6</button>
+      <button data-d="7">7</button><button data-d="8">8</button><button data-d="9">9</button>
+      <button id="pad-clear">C</button><button data-d="0">0</button><button id="pad-ok">✓</button>
+    </div>
+    <div class="pad-actions">
+      <button id="pad-hack" disabled>PIRATER LE CLAVIER</button>
+      <button id="pad-close">RECULER [Échap]</button>
+    </div>
+  </div>
+</div>
+
+<!-- ========== FIN ========== -->
+<div id="ending" class="overlay hidden">
+  <div class="menu-inner">
+    <div class="menu-logo ending-logo">ÉVASION<span> RÉUSSIE</span></div>
+    <p id="ending-text" class="menu-story"></p>
+    <button id="btn-restart">REJOUER</button>
+  </div>
+</div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
