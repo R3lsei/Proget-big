@@ -21,7 +21,7 @@ import { depuisBox3, depuisCentre } from '../physics/aabb.js';
 import { chercher } from '../perception/base/index.js';
 import {
   MODULE, HAUTEUR_CHAMBRE,
-  sol, mur, murPerce, porte, paroiCourbe, plafondCaissons, lumiereSpot,
+  sol, mur, murPerce, porte, paroiCourbe, plafondCaissons, lumiereSpot, COULEUR_SPOT,
   jardiniere, lierre, socleReceptacle, materiaux,
   borneTerminal, passerelle,
 } from './kit.js';
@@ -127,8 +127,33 @@ export function batir(chambre) {
   const plafond = plafondCaissons({ largeur, profondeur, etat });
   plafond.position.y = enMetres(HAUTEUR_CHAMBRE);
   groupe.add(plafond);
+
+  // Retombée au-dessus de la baie. Le plafond couvre le RECTANGLE de la pièce ;
+  // la baie, elle, bombe au-delà. Sans cette retombée, il restait une fente
+  // entre le haut du vitrage et le bord du plafond, par laquelle on voyait le
+  // ciel — une bande orange qui donnait l'impression que la verrière ne montait
+  // pas jusqu'en haut. Le défaut ne venait pas de la baie mais de ce qui aurait
+  // dû la coiffer.
+  if (murVitre) {
+    const [vx, vz] = ORIENTATIONS[murVitre].normale;
+    const murEnX = vx === 0;
+    const reculVitre = (murEnX ? enMetres(profondeur) : enMetres(largeur)) / 2;
+    const retombee = new THREE.Mesh(
+      new THREE.BoxGeometry(
+        murEnX ? enMetres(largeur) : FLECHE_VERRIERE + 0.3, 0.14,
+        murEnX ? FLECHE_VERRIERE + 0.3 : enMetres(profondeur)),
+      materiaux().panneau_propre);
+    retombee.position.set(
+      vx * (reculVitre + FLECHE_VERRIERE / 2), enMetres(HAUTEUR_CHAMBRE) + 0.07,
+      vz * (reculVitre + FLECHE_VERRIERE / 2));
+    retombee.receiveShadow = true;
+    groupe.add(retombee);
+  }
+  const eclairage = { lumieres: [], matiere: plafond.userData.matiereLampe };
   for (const lampe of plafond.userData.lampes) {
-    groupe.add(lumiereSpot(lampe.x, enMetres(HAUTEUR_CHAMBRE) - 0.12, lampe.z));
+    const spot = lumiereSpot(lampe.x, enMetres(HAUTEUR_CHAMBRE) - 0.12, lampe.z);
+    groupe.add(spot);
+    eclairage.lumieres.push({ lumiere: spot, intensite: spot.intensity });
   }
 
   // Porte, posée dans l'ouverture du mur de sortie.
@@ -213,6 +238,7 @@ export function batir(chambre) {
     terminaux,
     passerelles,
     objets: poserObjets(chambre, groupe),
+    eclairage,
     porte: { groupe: vantaux, ouvrir: vantaux.userData.ouvrir },
   };
 }

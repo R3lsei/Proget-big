@@ -527,7 +527,10 @@ export function plafondCaissons({ largeur = 8, profondeur = 8, etat = 'soigne' }
   const rangeesX = Math.max(2, Math.round(largeur / 3));
   const rangeesZ = Math.max(2, Math.round(profondeur / 3));
   const disque = new THREE.CircleGeometry(0.17, 16);
+  // Un seul matériau pour tous les hublots de la salle : ils vacillent ensemble,
+  // donc une seule couleur à modifier par image.
   const lampe = new THREE.MeshBasicMaterial({ color: COULEUR_SPOT.clone() });
+  groupe.userData.matiereLampe = lampe;
   groupe.userData.lampes = [];
   for (let i = 0; i < rangeesX; i++) {
     for (let j = 0; j < rangeesZ; j++) {
@@ -550,7 +553,49 @@ export function plafondCaissons({ largeur = 8, profondeur = 8, etat = 'soigne' }
  * Franchement FROIDE face à l'orange du dehors. Un blanc neutre se noierait
  * dans l'ambre général et l'on perdrait le contraste des deux mondes.
  */
-const COULEUR_SPOT = new THREE.Color(0xdfeeff).multiplyScalar(2.2);
+export const COULEUR_SPOT = new THREE.Color(0xdfeeff).multiplyScalar(2.2);
+
+/**
+ * Défaillance de l'éclairage : un multiplicateur d'intensité entre 0 et 1.
+ *
+ * Le lieu est abandonné depuis assez longtemps pour que l'herbe pousse dans les
+ * joints, mais les lampes tiennent encore. Ce sont donc des lampes en SURSIS —
+ * et une lampe en sursis clignote. C'est ce qui transforme un décor en lieu :
+ * une lumière parfaitement stable dit « rendu 3D », une lumière qui hésite dit
+ * « ça tient depuis trop longtemps ».
+ *
+ * Tout le circuit vacille ensemble, jamais une lampe seule. Une baisse de
+ * tension touche la ligne entière ; des tubes clignotant chacun dans son coin
+ * se liraient comme un effet, pas comme une panne. Cela permet aussi de garder
+ * un seul matériau partagé pour tous les hublots.
+ *
+ * Fonction PURE du temps : même instant, même valeur. Le clignotement se rejoue
+ * donc à l'identique, ce qui le rend vérifiable — un effet aléatoire à chaque
+ * image ne se teste pas, et ne se corrige pas non plus.
+ */
+export function clignotement(temps, graine = 1) {
+  const alea = (n) => {
+    const x = Math.sin(n * 12.9898 + graine * 78.233) * 43758.5453;
+    return x - Math.floor(x);
+  };
+  const CYCLE = 6.5;
+  const index = Math.floor(temps / CYCLE);
+  // Deux cycles sur trois ne se passe rien : c'est l'attente qui rend la
+  // défaillance efficace. Un clignotement permanent devient un papier peint.
+  if (alea(index) > 0.35) return 1;
+
+  const duree = 0.25 + alea(index + 0.25) * 0.6;
+  const debut = alea(index + 0.5) * (CYCLE - duree);
+  const local = temps - index * CYCLE - debut;
+  if (local < 0 || local > duree) return 1;
+
+  // Enveloppe en cloche : la crise s'installe et se résorbe. Un créneau franc
+  // ressemblerait à un interrupteur, pas à un contact qui faiblit.
+  const enveloppe = Math.sin(Math.PI * (local / duree));
+  const battement = 0.5 + 0.5 * Math.sin(temps * 41 + graine);
+  const creux = 0.12 + 0.35 * alea(index + 0.75);
+  return 1 - (1 - creux) * enveloppe * battement;
+}
 
 /** Vraie lumière d'un spot : sans ombre, donc bon marché. */
 export function lumiereSpot(x, y, z) {

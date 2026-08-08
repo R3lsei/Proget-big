@@ -33,7 +33,7 @@ import { basename, join } from 'node:path';
  * `echelle` ramène chaque modèle à une taille crédible en intérieur, et
  * `hauteurMax` sert de garde-fou vérifié après compression.
  */
-export const RETENUS = Object.freeze([
+export const RETENUS_VEGETATION = Object.freeze([
   // Couvre-sol : c'est ce qui envahit un lieu abandonné.
   { fichier: 'Grass_Common_Short', nom: 'herbe-courte', echelle: 1.0, hauteurMax: 0.5 },
   { fichier: 'Grass_Common_Tall', nom: 'herbe-haute', echelle: 1.0, hauteurMax: 1.0 },
@@ -60,6 +60,38 @@ export const RETENUS = Object.freeze([
   { fichier: 'Rock_Medium_1', nom: 'rocher', echelle: 1.0, hauteurMax: 1.2 },
 ]);
 
+/**
+ * Mobilier de laboratoire, tiré du Modular SciFi MegaKit (CC0).
+ *
+ * Choisi pour ce qu'il RACONTE, pas pour remplir. Les références montrent un
+ * lieu où des gens ont travaillé : des postes, des caisses qu'on n'a pas
+ * rangées, des conduits, de la signalétique murale. Le lot en propose cent
+ * quatre-vingt-onze — rails, plates-formes, portes, aliens. Vingt suffisent, et
+ * les cent soixante-dix autres n'auraient été que du poids.
+ */
+export const RETENUS_MOBILIER = Object.freeze([
+  { fichier: 'Props/Prop_Computer', nom: 'poste-console' },
+  { fichier: 'Props/Prop_ItemHolder', nom: 'etagere' },
+  { fichier: 'Props/Prop_Chest', nom: 'coffre' },
+  { fichier: 'Props/Prop_Crate3', nom: 'caisse-1' },
+  { fichier: 'Props/Prop_Crate4', nom: 'caisse-2' },
+  { fichier: 'Props/Prop_Barrel_Large', nom: 'fut' },
+  { fichier: 'Props/Prop_AccessPoint', nom: 'boitier-mural' },
+  { fichier: 'Props/Prop_Vent_Big', nom: 'bouche-large' },
+  { fichier: 'Props/Prop_Vent_Small', nom: 'bouche-petite' },
+  { fichier: 'Props/Prop_PipeHolder', nom: 'support-conduit' },
+  { fichier: 'Props/Prop_Cable_1', nom: 'cable-1' },
+  { fichier: 'Props/Prop_Cable_3', nom: 'cable-2' },
+  { fichier: 'Props/Prop_Light_Wide', nom: 'applique-large' },
+  { fichier: 'Props/Prop_Light_Corner', nom: 'applique-angle' },
+  { fichier: 'Props/Prop_Fan_Small', nom: 'ventilateur' },
+  { fichier: 'Columns/Column_Pipes', nom: 'colonne-conduits' },
+  { fichier: 'Decals/Decal_Sign', nom: 'panneau-signaletique' },
+  { fichier: 'Decals/Decal_Logo', nom: 'logo-mural' },
+  { fichier: 'Decals/Decal_A', nom: 'lettre-a' },
+  { fichier: 'Decals/Decal_7', nom: 'chiffre-7' },
+]);
+
 /** Côté maximal des textures, en pixels. */
 const TEXTURE = 512;
 
@@ -77,7 +109,7 @@ function main() {
 
   let total = 0;
   const rapport = [];
-  for (const modele of RETENUS) {
+  for (const modele of (process.env.LOT === 'mobilier' ? RETENUS_MOBILIER : RETENUS_VEGETATION)) {
     const entree = join(source, `${modele.fichier}.gltf`);
     if (!existsSync(entree)) {
       console.error(`  ✗ ${modele.fichier} absent de ${source}`);

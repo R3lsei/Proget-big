@@ -326,6 +326,78 @@ export function massif(espece, {
 }
 
 /**
+ * Charge un modèle quelconque et le met à la taille voulue.
+ *
+ * Mesuré à la pose, pas déclaré à l'avance. Les modèles viennent de lots
+ * modelés pour d'autres pièces que les nôtres, et une taille écrite à la main
+ * est un pari — c'est ce pari qui avait donné des fleurs plus larges qu'une
+ * plaque de pression. La boîte englobante ne se trompe jamais.
+ */
+export async function chargerMeuble(descripteur, chargeur, base = '') {
+  if (chargesMeubles.has(descripteur.nom)) return chargesMeubles.get(descripteur.nom);
+  try {
+    const gltf = await chargeur.loadAsync(base + descripteur.fichier);
+    const racine = gltf.scene;
+    racine.updateMatrixWorld(true);
+    const boite = new THREE.Box3().setFromObject(racine);
+    const hauteur = Math.max(1e-3, boite.max.y - boite.min.y);
+    const charge = {
+      ...descripteur,
+      racine,
+      // Facteur ramenant le modèle à sa taille de jeu, et décalage remettant sa
+      // base à zéro : un modèle dont l'origine n'est pas au sol s'enfoncerait
+      // ou flotterait, et cela varie d'un fichier à l'autre.
+      // Contraint par les DEUX dimensions. Mettre à l'échelle par la seule
+      // hauteur avait déjà donné des fleurs plus larges qu'une plaque de
+      // pression ; ici, un décal mural de deux centimètres d'épaisseur visé à
+      // quarante-cinq était gonflé vingt-deux fois et barrait la salle. Le
+      // même piège, à trois semaines d'intervalle, parce que la leçon était
+      // dans un commentaire au lieu d'être dans le code partagé.
+      facteur: Math.min(
+        descripteur.hauteurVisee / hauteur,
+        descripteur.largeur / Math.max(1e-3, Math.max(
+          boite.max.x - boite.min.x, boite.max.z - boite.min.z))),
+      poserSurZero: -boite.min.y,
+    };
+    chargesMeubles.set(descripteur.nom, charge);
+    return charge;
+  } catch (erreur) {
+    console.warn(`Mobilier : « ${descripteur.nom} » indisponible.`, erreur.message);
+    chargesMeubles.set(descripteur.nom, null);
+    return null;
+  }
+}
+
+const chargesMeubles = new Map();
+
+/**
+ * Matérialise un ameublement calculé par `mobilier.js`.
+ *
+ * Par clonage et non par instanciation : les meubles sont peu nombreux et tous
+ * différents, là où la végétation répète quelques espèces des dizaines de fois.
+ * Instancier ce qui n'est pas répété ajoute de la complexité sans rien gagner.
+ */
+export function poserMobilier(ameublement, meubles) {
+  const groupe = new THREE.Group();
+  groupe.name = 'mobilier';
+  for (const pose of ameublement) {
+    const modele = meubles.get(pose.meuble);
+    if (!modele) continue;
+    const piece = modele.racine.clone(true);
+    piece.scale.setScalar(modele.facteur);
+    piece.position.set(pose.x, pose.y + modele.poserSurZero * modele.facteur, pose.z);
+    piece.rotation.y = pose.rotation;
+    piece.traverse((noeud) => {
+      if (!noeud.isMesh) return;
+      noeud.castShadow = true;
+      noeud.receiveShadow = true;
+    });
+    groupe.add(piece);
+  }
+  return groupe;
+}
+
+/**
  * Plante un semis : une InstancedMesh par espèce, quel qu'en soit le nombre.
  *
  * Le semis vient de `semis.js`, qui a déjà répondu à la seule question qui

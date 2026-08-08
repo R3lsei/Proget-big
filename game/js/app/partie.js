@@ -21,11 +21,12 @@ import {
 } from '../perception/detecteur.js';
 import * as cocossd from '../perception/detecteurs/cocossd.js';
 import { batir, departDe, aFranchi } from '../rendering/batisseur.js';
-import { ambiance } from '../rendering/kit.js';
+import { ambiance, clignotement, COULEUR_SPOT } from '../rendering/kit.js';
 import { dehors, soleilDeTempete, cieletSable } from '../rendering/dehors.js';
 import { creerComposeur, redimensionner } from '../rendering/posttraitement.js';
 import { semer } from '../rendering/semis.js';
-import { chargerEspece, planterSemis } from '../rendering/vegetation.js';
+import { chargerEspece, planterSemis, chargerMeuble, poserMobilier } from '../rendering/vegetation.js';
+import { MEUBLES, meubler } from '../rendering/mobilier.js';
 import { SEMABLES } from '../rendering/semis.js';
 import { GLTFLoader } from '../../lib/GLTFLoader.js';
 import { DRACOLoader } from '../../lib/DRACOLoader.js';
@@ -73,6 +74,31 @@ export function demarrer(canvas, indexChambre = 0) {
   const camera = new THREE.PerspectiveCamera(
     72, (canvas.clientWidth || 1280) / (canvas.clientHeight || 720), 0.1, 200);
 
+  // ─── Reflets ──────────────────────────────────────────────────────────────
+  //
+  // Une sonde cubique placée au centre de la salle capte ce qui l'entoure, et
+  // le résultat devient l'environnement de TOUS les matériaux. La vitre reflète
+  // alors le laboratoire, le carrelage poli reflète la baie et le ciel — les
+  // reflets des références, qui ne s'inventent pas au réglage.
+  //
+  // Capturée UNE fois par chambre, pas à chaque image : le décor ne bouge pas,
+  // et six rendus de scène par image coûteraient plus cher que tout le reste.
+  // Un reflet figé d'un décor figé est exact.
+  const sonde = new THREE.CubeCamera(0.3, 150,
+    new THREE.WebGLCubeRenderTarget(256, {
+      generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter,
+    }));
+  sonde.position.set(0, 1.7, 0);
+  scene.add(sonde);
+
+  /** Recapture l'environnement. À appeler quand le décor a changé. */
+  function capterReflets() {
+    // L'environnement précédent sert de fond à la capture : un seul rebond,
+    // ce qui suffit. Le remettre à zéro avant capturerait une salle noire.
+    sonde.update(renderer, scene);
+    scene.environment = sonde.renderTarget.texture;
+  }
+
   // Réassignés à chaque chambre. Ce sont des `let` et non des `const` parce que
   // le jeu ENCHAÎNE désormais les chambres dans la même page : tout recharger
   // en rouvrant l'URL perdrait la sacoche, qui doit survivre à toute la partie.
@@ -101,6 +127,11 @@ export function demarrer(canvas, indexChambre = 0) {
     termine: false,
     dernierMessage: '',
   };
+  // Exposé APRÈS la création de l'état : l'affectation figurait au-dessus de sa
+  // déclaration, ce que `const` interdit. Le module se chargeait, la page
+  // restait noire, et rien ne le disait — c'est exactement le cas que le témoin
+  // de démarrage sait maintenant distinguer.
+  etat.capterReflets = capterReflets;
 
   // ─── Végétation ───────────────────────────────────────────────────────────
   //
@@ -110,7 +141,9 @@ export function demarrer(canvas, indexChambre = 0) {
   // noir, alors que rien du jeu n'en dépend. La verdure apparaît quand elle est
   // prête, et le décor procédural tient la place en attendant.
   const especes = new Map();
+  const meubles = new Map();
   let verdurePosee = null;
+  let mobilierPose = null;
 
   /** Sème et plante la verdure de la chambre en place. */
   function verdir() {
@@ -125,6 +158,18 @@ export function demarrer(canvas, indexChambre = 0) {
     const graine = [...chambre.id].reduce((s, c) => s + c.charCodeAt(0), 0);
     verdurePosee = planterSemis(semer(chambre, { depart, graine }), especes);
     bati.groupe.add(verdurePosee);
+
+    if (mobilierPose) {
+      mobilierPose.parent?.remove(mobilierPose);
+      mobilierPose = null;
+    }
+    if (meubles.size) {
+      mobilierPose = poserMobilier(meubler(chambre, { depart, graine }), meubles);
+      bati.groupe.add(mobilierPose);
+    }
+    // La verdure fait partie de ce que la vitre reflète : on recapte une fois
+    // qu'elle est en place, sinon les reflets montreraient une salle vide.
+    capterReflets();
   }
 
   etat.especesChargees = 0;
@@ -137,11 +182,18 @@ export function demarrer(canvas, indexChambre = 0) {
     // au bout de douze secondes, pour huit cents kilo-octets au total. Le
     // navigateur sait mener plusieurs requêtes de front, et le décodage occupe
     // ses ouvriers de fond ; le faire attendre ne servait personne.
-    await Promise.all(SEMABLES.map(async ({ espece }) => {
-      const charge = await chargerEspece(espece, chargeur, './');
-      if (charge) especes.set(espece, charge);
-      etat.especesChargees = especes.size;
-    }));
+    await Promise.all([
+      ...SEMABLES.map(async ({ espece }) => {
+        const charge = await chargerEspece(espece, chargeur, './');
+        if (charge) especes.set(espece, charge);
+        etat.especesChargees = especes.size;
+      }),
+      ...MEUBLES.map(async (descripteur) => {
+        const charge = await chargerMeuble(descripteur, chargeur, './');
+        if (charge) meubles.set(descripteur.nom, charge);
+        etat.meublesCharges = meubles.size;
+      }),
+    ]);
     verdir();
   })().catch((erreur) => {
     // Une promesse rejetée sans `catch` disparaît sans un mot : la verdure ne
@@ -191,6 +243,7 @@ export function demarrer(canvas, indexChambre = 0) {
     etat.enclenches = new Set();
     etat.ouverture = 0;
     etat.ouverte = false;
+    capterReflets();
   }
   etat.chargerChambre = chargerChambre;
 
@@ -502,7 +555,18 @@ export function demarrer(canvas, indexChambre = 0) {
     // Le ciel avance avec l'horloge du navigateur, pas avec le pas de
     // simulation : la tempête n'est pas du jeu, elle est de l'ambiance, et rien
     // du gameplay ne doit en dépendre.
-    exterieur.animer(maintenant / 1000);
+    const secondes = maintenant / 1000;
+    exterieur.animer(secondes);
+
+    // L'éclairage vacille. Tout le circuit ensemble : une baisse de tension
+    // touche la ligne entière, et des tubes clignotant chacun de son côté se
+    // liraient comme un effet plutôt que comme une panne.
+    const facteur = clignotement(secondes, etat.indexChambre + 1);
+    for (const { lumiere, intensite } of bati.eclairage.lumieres) {
+      lumiere.intensity = intensite * facteur;
+    }
+    bati.eclairage.matiere.color.copy(COULEUR_SPOT).multiplyScalar(facteur);
+    etat.eclairage = facteur;
     image.composeur.render();
     requestAnimationFrame(boucle);
   }

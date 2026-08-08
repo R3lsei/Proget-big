@@ -33,6 +33,15 @@ Le script porte aussi la liste des modèles retenus et la raison des écarts : l
 quarante-neuf autres sont des arbres de plein champ de plusieurs mètres, sans
 emploi sous une verrière à 3,6 m.
 
+## Lot Modular SciFi MegaKit — Quaternius
+
+Vingt modèles de mobilier, rangés dans `../mobilier/`. Même auteur, même
+licence : **CC0 1.0**, domaine public, aucune attribution exigée.
+
+Vingt retenus sur cent quatre-vingt-onze. Le reste est fait de rails, de
+plates-formes, de portes et d'aliens, sans emploi dans un laboratoire. 1,4 Mo
+au total après Draco + WebP.
+
 ## Ce que cela impose
 
 `plante-pot.glb` est en CC-BY 4.0 : sa mention doit apparaître **dans le jeu
