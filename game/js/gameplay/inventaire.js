@@ -101,6 +101,33 @@ export function quitterLaSalle(inventaire) {
   return inventaire;
 }
 
+/**
+ * Purge complète : la sacoche redevient vide, connaissances comprises.
+ *
+ * ─── Une décision qui contredit une autre décision, assumée ─────────────────
+ *
+ * Ce module dit, et continue de dire, que la connaissance appartient au joueur :
+ * `quitterLaSalle` efface les matérialisations et garde les objets connus,
+ * parce que remettre la sacoche à zéro à chaque porte franchie « punirait le
+ * joueur d'avoir progressé ». C'est toujours vrai entre deux salles.
+ *
+ * La fin du tutoriel n'est pas entre deux salles : c'est une rupture. Le jeu
+ * change d'acte, et repartir de rien fait partie de ce que l'acte raconte.
+ * Mais une purge silencieuse ne se lit jamais comme un choix — elle se lit
+ * comme un bug, et le joueur croit avoir perdu sa progression. Elle n'est donc
+ * appelée QUE depuis un passage qui la MONTRE : le sas de décontamination de la
+ * cinématique, et la consigne de la halle qui l'écrit noir sur blanc.
+ *
+ * Garde-fou permanent : le vérificateur interdit à toute salle d'exiger la
+ * caméra. Une sacoche vide ne peut donc bloquer aucune chambre — sans cette
+ * règle, cette fonction serait une façon de rendre le jeu infinissable.
+ */
+export function purger(inventaire) {
+  inventaire.connus.clear();
+  inventaire.materialises.clear();
+  return inventaire;
+}
+
 /** Places restantes pour de nouvelles matérialisations. */
 export function placesRestantes(inventaire) {
   return MATERIALISATIONS_SIMULTANEES - inventaire.materialises.size;

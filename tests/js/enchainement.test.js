@@ -16,12 +16,20 @@ import { CHAMBRES } from '../../game/js/gameplay/chambres.js';
 import { aFranchi, seuilDe, departDe } from '../../game/js/rendering/batisseur.js';
 import { MODULE } from '../../game/js/rendering/kit.js';
 
-/** Un point à `avance` mètres le long de la normale de sortie, `lateral` de côté. */
-function point(chambre, avance, lateral = 0) {
-  const { nx, nz } = seuilDe(chambre);
+/**
+ * Un point à `avance` mètres le long de la normale de sortie, `lateral` de côté.
+ *
+ * À la HAUTEUR du seuil par défaut. Tant que toutes les portes étaient au sol,
+ * la question ne se posait pas ; la halle de maintenance a la sienne sur une
+ * mezzanine, et un point de test resté à zéro décrivait alors un joueur qui
+ * passe trois mètres SOUS la porte.
+ */
+function point(chambre, avance, lateral = 0, y = null) {
+  const seuil = seuilDe(chambre);
   return {
-    x: nx * avance + -nz * lateral,
-    z: nz * avance + nx * lateral,
+    x: seuil.nx * avance + -seuil.nz * lateral,
+    z: seuil.nz * avance + seuil.nx * lateral,
+    y: y === null ? seuil.y : y,
   };
 }
 
@@ -110,5 +118,27 @@ test('les chambres sont ordonnées et identifiables', () => {
   assert.equal(new Set(ids).size, ids.length, 'identifiants dupliqués');
   for (const chambre of CHAMBRES) {
     assert.ok(chambre.titre, `${chambre.id} n'a pas de titre affichable`);
+  }
+});
+
+test('passer SOUS une porte perchée ne franchit rien', () => {
+  // La halle de maintenance a sa sortie sur une mezzanine, à 2,80 m. Le plan du
+  // mur, lui, descend jusqu'au sol : un joueur qui marche au rez-de-chaussée
+  // franchit donc exactement le même plan, au même endroit, dans la même
+  // direction. Sans test de hauteur, la salle se terminait en passant dessous —
+  // c'est-à-dire sans jamais résoudre l'énigme, comme la porte sans collision
+  // rendait toutes les énigmes facultatives.
+  for (const chambre of CHAMBRES) {
+    const { distance, y } = seuilDe(chambre);
+    if (y < 1) continue;
+    assert.equal(aFranchi(point(chambre, distance + 0.1, 0, 0), chambre), false,
+      `${chambre.id} : franchie en passant sous la porte`);
+  }
+});
+
+test('une porte perchée se franchit à sa hauteur', () => {
+  for (const chambre of CHAMBRES) {
+    const { distance, y } = seuilDe(chambre);
+    assert.equal(aFranchi(point(chambre, distance + 0.1, 0, y), chambre), true, chambre.id);
   }
 });

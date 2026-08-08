@@ -13,6 +13,7 @@ import {
 } from '../gameplay/mecanismes.js';
 import {
   creerInventaire, memoriser, materialiser, dematerialiser, contenu, placesRestantes,
+  purger,
 } from '../gameplay/inventaire.js';
 import { chercher } from '../perception/base/index.js';
 import { ouvrir as ouvrirCamera, fermer as fermerCamera, estActive } from '../perception/camera.js';
@@ -35,6 +36,11 @@ import {
   objetVise, terminalAPortee, restaurerEgares, HAUTEUR_YEUX,
 } from './joueur.js';
 import { GABARIT_OBJET } from '../rendering/batisseur.js';
+import { avancerPlateforme } from '../physics/plateforme.js';
+import {
+  etatCinematique, dureeDe, instantDePurge, ENTREE_HALLE,
+} from '../rendering/cinematique.js';
+import { GABARIT as GABARIT_JOUEUR } from './joueur.js';
 import { PORTEE_SAISIE } from '../physics/portage.js';
 
 /** Vitesse d'ouverture de la porte, en fraction par seconde. */
@@ -221,6 +227,69 @@ export function demarrer(canvas, indexChambre = 0) {
    * non. Un terminal piraté dans la salle de réveil n'a aucun sens dans la
    * serre.
    */
+  // ─── Cinématique ──────────────────────────────────────────────────────────
+  //
+  // Un seul état, trois règles. Elle se passe à n'importe quelle touche ; elle
+  // ne bloque jamais la simulation plus que sa durée ; et elle est le SEUL
+  // endroit d'où la sacoche se purge, pour que la purge et son éclair soient le
+  // même événement aux yeux du joueur.
+  let plan = null;
+
+  function lancerCinematique(sequence) {
+    // L'horloge de la séquence est la SIENNE, prise au démarrage. La dériver du
+    // pas de la boucle ne marche pas : la toute première image après un
+    // chargement de chambre porte tout le temps du chargement, et la séquence
+    // sautait d'un coup à sa dernière image. Bornée, elle traînait sur les
+    // machines lentes ; non bornée, elle s'évaporait. Le bon repère n'était ni
+    // l'un ni l'autre : c'est l'instant où elle commence.
+    // `debut` est laissé VIDE : l'horloge part à la première image réellement
+    // affichée, pas à la construction de la chambre. Bâtir la halle et capturer
+    // ses reflets prend plusieurs secondes, pendant lesquelles l'écran de
+    // chargement est encore là — la séquence s'y jouait en entier, et le joueur
+    // reprenait la main sans avoir rien vu.
+    plan = sequence ? { sequence, temps: 0, debut: null, purgeFaite: false } : null;
+    etat.cinematique = plan;
+    if (!sequence) rendreLaMain();
+  }
+
+  function rendreLaMain() {
+    plan = null;
+    etat.cinematique = null;
+    if (etat.surCinematique) etat.surCinematique({ voile: 0, eclair: 0, texte: '' });
+  }
+
+  /** Avance la séquence d'une image. Renvoie vrai tant qu'elle a la main. */
+  function avancerCinematique() {
+    if (!plan) return false;
+    if (plan.debut === null) plan.debut = performance.now();
+    plan.temps = (performance.now() - plan.debut) / 1000;
+    const vue = etatCinematique(plan.sequence, plan.temps);
+
+    // La purge tombe sur l'éclair, une seule fois. Les objets déjà matérialisés
+    // repartent avec — sinon le joueur garderait dans la salle des objets que
+    // sa sacoche ne connaît plus, ce qui est le pire des deux états.
+    if (!plan.purgeFaite && plan.temps >= instantDePurge(plan.sequence)) {
+      purger(etat.inventaire);
+      plan.purgeFaite = true;
+    }
+
+    camera.position.set(...vue.position);
+    camera.lookAt(...vue.cible);
+    if (etat.surCinematique) etat.surCinematique(vue);
+
+    if (plan.temps >= dureeDe(plan.sequence)) { rendreLaMain(); return false; }
+    return true;
+  }
+
+  /** Passe la séquence. La purge a lieu quand même : elle n'est pas optionnelle. */
+  function passerCinematique() {
+    if (!plan) return false;
+    if (!plan.purgeFaite) purger(etat.inventaire);
+    rendreLaMain();
+    return true;
+  }
+  etat.passerCinematique = passerCinematique;
+
   function chargerChambre(index) {
     if (bati) {
       scene.remove(bati.groupe);
@@ -264,7 +333,13 @@ export function demarrer(canvas, indexChambre = 0) {
     etat.enclenches = new Set();
     etat.ouverture = 0;
     etat.ouverte = false;
+    etat.faits = new Set();
     capterReflets();
+
+    // La cinématique d'entrée, s'il y en a une pour cette chambre. Lancée APRÈS
+    // la capture des reflets : la caméra de la séquence traverse la salle, et
+    // elle doit voir un décor déjà éclairé.
+    lancerCinematique(chambre.cinematique ? ENTREE_HALLE : null);
   }
   etat.chargerChambre = chargerChambre;
 
@@ -438,6 +513,11 @@ export function demarrer(canvas, indexChambre = 0) {
   });
 
   addEventListener('keydown', (e) => {
+    // N'IMPORTE QUELLE touche passe la cinématique, et elle ne fait rien
+    // d'autre ce coup-là : à la deuxième partie, personne ne veut revoir douze
+    // secondes de plan qu'il connaît, et la touche de saut ne doit pas faire
+    // sauter le joueur au moment où il reprend la main.
+    if (passerCinematique()) { e.preventDefault(); return; }
     if (TOUCHES[e.code]) { intentions[TOUCHES[e.code]] = true; e.preventDefault(); }
     if (e.code === 'KeyE') agir();
   });
@@ -461,10 +541,44 @@ export function demarrer(canvas, indexChambre = 0) {
     // Une passerelle déployée devient un sol ; rentrée, elle n'existe plus.
     // Recomposer la liste à chaque pas coûte peu et évite qu'un pont rentré
     // reste marchable — le pire des deux mondes.
+    // ─── Les élévateurs, AVANT tout le reste ────────────────────────────────
+    //
+    // Ils bougent le sol. Il faut donc les déplacer — et emporter qui est
+    // dessus — avant que la gravité et la résolution de collisions n'aient leur
+    // mot à dire, sinon le joueur est traité comme flottant au-dessus d'un vide
+    // qui, une microseconde plus tard, sera un plancher.
+    //
+    // Leur consigne vient des faits du pas PRÉCÉDENT : un tour de retard,
+    // invisible à l'œil, et cela évite une dépendance circulaire entre « où est
+    // l'élévateur » et « quels mécanismes sont actifs », qui dépend de qui pèse
+    // sur quelle plaque, qui dépend de où est l'élévateur.
+    for (const [id, lift] of bati.elevateurs ?? []) {
+      // Trois états. Elle ne descend QUE si le levage est déverrouillé et que
+      // rien ne pèse sur la plaque ; partout ailleurs elle est en haut. Une
+      // simple condition à deux états la faisait descendre dès la première
+      // image, sans qu'on ait rien piraté.
+      const faits = etat.faits ?? new Set();
+      const descend = circuitOuvert(lift.deverrouillage, faits)
+        && !(lift.rappel && circuitOuvert(lift.rappel, faits));
+      const consigne = descend ? lift.bas : lift.haut;
+      const { hauteur } = avancerPlateforme(
+        lift.forme, lift.hauteur, consigne, lift.vitesse, dt,
+        [{ corps: joueur, gabarit: GABARIT_JOUEUR },
+          ...objets.map((corps) => ({ corps, gabarit: corps.gabarit ?? GABARIT_OBJET }))]);
+      lift.hauteur = hauteur;
+      lift.placer(hauteur);
+      if (Math.abs(hauteur - lift.haut) < 0.02) etat.deployees?.add(id);
+    }
+
+    // Une passerelle déployée devient un sol ; rentrée, elle n'existe plus.
+    // Recomposer la liste à chaque pas coûte peu et évite qu'un pont rentré
+    // reste marchable — le pire des deux mondes.
     const obstacles = [...bati.colliders];
     for (const [id, pont] of bati.passerelles) {
       if ((pont.progression ?? 0) > 0.98) obstacles.push(pont.collider);
     }
+    // Le tablier de chaque élévateur, à sa hauteur du moment.
+    for (const [, lift] of bati.elevateurs ?? []) obstacles.push(lift.boite(lift.hauteur));
     // Les vantaux, à leur position du moment. La porte n'arrêtait PERSONNE : on
     // sortait d'une salle non résolue en marchant droit dedans, ce qui rendait
     // toutes les énigmes facultatives. Recalculés à chaque pas pour la même
@@ -498,7 +612,11 @@ export function demarrer(canvas, indexChambre = 0) {
     // terminaux enclenchés, passerelles déployées — mais la grammaire n'en voit
     // qu'un seul ensemble. C'est ce qui permet à une sortie de les mélanger sans
     // une ligne de code supplémentaire.
-    const faits = faitsDeChambre(etat.actifs, etat.enclenches, bati.passerelles);
+    // Les élévateurs entrent dans le même sac que les passerelles : ils
+    // produisent un fait selon la même condition, c'est ce qui a permis au
+    // vérificateur de les comprendre sans rien apprendre de neuf.
+    const faits = faitsDeChambre(etat.actifs, etat.enclenches,
+      [...bati.passerelles, ...(bati.elevateurs ?? [])]);
     for (const [instance, terminal] of bati.terminaux) {
       terminal.borne.userData.signaler(etat.enclenches.has(instance));
     }
@@ -572,9 +690,25 @@ export function demarrer(canvas, indexChambre = 0) {
   function boucle(maintenant) {
     accumulateur += Math.min((maintenant - precedent) / 1000, RETARD_MAX);
     precedent = maintenant;
-    while (accumulateur >= PAS_FIXE) {
-      pas(PAS_FIXE);
-      accumulateur -= PAS_FIXE;
+    // Pendant une cinématique, la simulation est GELÉE. Pas ralentie : gelée.
+    // La faire tourner en arrière-plan laisserait la gravité, les plaques et
+    // les élévateurs agir sans que le joueur puisse rien y faire — et il
+    // reprendrait la main dans un état qu'il n'a pas produit.
+    //
+    // Elle a sa propre horloge, prise à son démarrage, et n'emprunte rien au
+    // pas de simulation. Celui-ci est bridé pour que la physique survive à un
+    // à-coup, ce qui allongeait la séquence sur les machines lentes ; le
+    // débrider la faisait au contraire s'évaporer, la première image après un
+    // chargement portant tout le temps du chargement. Une cinématique dure ce
+    // qu'elle annonce, quelle que soit la carte graphique — c'est tout.
+    const enPlan = avancerCinematique();
+    if (enPlan) {
+      accumulateur = 0;
+    } else {
+      while (accumulateur >= PAS_FIXE) {
+        pas(PAS_FIXE);
+        accumulateur -= PAS_FIXE;
+      }
     }
     // On rend par le composeur, jamais par le renderer : `renderer.render`
     // afficherait la scène brute et court-circuiterait toute la chaîne, sans

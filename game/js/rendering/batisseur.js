@@ -24,7 +24,9 @@ import {
   sol, mur, murPerce, porte, paroiCourbe, plafondCaissons, lumiereSpot, COULEUR_SPOT,
   jardiniere, lierre, socleReceptacle, materiaux,
   borneTerminal, passerelle, fosse, panneauConsigne,
+  mezzanine, elevateur, EPAISSEUR_ELEVATEUR,
 } from './kit.js';
+import { boiteDePlateforme } from '../physics/plateforme.js';
 import { mettreEnPage, placerConsigne } from './consigne.js';
 import {
   ORIENTATIONS, dallesDe, departDe, seuilDe, aFranchi, solPresent, solPorte, FLECHE_VERRIERE,
@@ -232,6 +234,10 @@ export function batir(chambre) {
     pont.updateMatrixWorld(true);
     passerelles.set(decl.id, {
       condition: decl.condition,
+      // La CONSIGNE physique n'est pas la condition du fait : une passerelle
+      // élévatrice a trois états, pas deux. Voir la déclaration de la chambre.
+      deverrouillage: decl.deverrouillage ?? decl.condition,
+      rappel: decl.rappel ?? null,
       groupe: pont,
       deployer: pont.userData.deployer,
       // Le collider n'est pas ajouté à la liste : il n'existe que déployé, et
@@ -243,6 +249,63 @@ export function batir(chambre) {
         enMetres(decl.x ?? 0), -0.25, enMetres(decl.z ?? 0),
         (decl.largeur ?? 2) * MODULE, 0.5, (decl.longueur ?? 3) * MODULE),
     });
+  }
+
+  // ─── Mezzanines ───────────────────────────────────────────────────────────
+  //
+  // Un plancher perché est un obstacle comme un autre pour la physique : une
+  // boîte pleine sous sa surface. C'est ce qui permet d'y marcher SANS que rien
+  // d'autre du moteur n'ait à connaître la notion d'étage.
+  for (const decl of chambre.mezzanines ?? []) {
+    const etage = mezzanine({
+      largeur: decl.largeur, profondeur: decl.profondeur,
+      hauteur: decl.hauteur, etat, ouvertureX: decl.ouvertureX ?? null,
+    });
+    etage.position.set(enMetres(decl.x ?? 0), 0, enMetres(decl.z ?? 0));
+    groupe.add(etage);
+    colliders.push(depuisCentre(
+      enMetres(decl.x ?? 0), decl.hauteur - 0.6, enMetres(decl.z ?? 0),
+      enMetres(decl.largeur), 1.2, enMetres(decl.profondeur)));
+  }
+
+  // ─── Passerelles élévatrices ──────────────────────────────────────────────
+  //
+  // Le collider n'entre PAS dans la liste figée : il suit le tablier, image par
+  // image, et c'est la boucle de jeu qui l'ajoute. Même règle que pour la porte
+  // et pour le pont déployé — tout ce qui bouge a une collision recalculée, et
+  // tout ce qui ne bouge pas l'a une fois pour toutes.
+  const elevateurs = new Map();
+  for (const decl of chambre.elevateurs ?? []) {
+    const cage = elevateur({
+      largeur: decl.largeur ?? 2, longueur: decl.longueur ?? 2,
+      course: decl.haut ?? 2.8, etat,
+    });
+    cage.position.set(enMetres(decl.x ?? 0), 0, enMetres(decl.z ?? 0));
+    groupe.add(cage);
+    const forme = {
+      x: enMetres(decl.x ?? 0), z: enMetres(decl.z ?? 0),
+      largeur: (decl.largeur ?? 2) * MODULE,
+      longueur: (decl.longueur ?? 2) * MODULE,
+      epaisseur: EPAISSEUR_ELEVATEUR,
+    };
+    elevateurs.set(decl.id, {
+      forme,
+      bas: decl.bas ?? 0,
+      haut: decl.haut ?? 2.8,
+      vitesse: decl.vitesse ?? 0.47,
+      condition: decl.condition,
+      // La CONSIGNE physique n'est pas la condition du fait : une passerelle
+      // élévatrice a trois états, pas deux. Voir la déclaration de la chambre.
+      deverrouillage: decl.deverrouillage ?? decl.condition,
+      rappel: decl.rappel ?? null,
+      // Il démarre EN HAUT. C'est la mise en scène de la salle : la sortie est
+      // visible et inaccessible dès la première seconde, ce qui pose la
+      // question avant que le joueur ait fait un pas.
+      hauteur: decl.haut ?? 2.8,
+      placer: cage.userData.placer,
+      boite: (hauteur) => depuisBox3Plateforme(forme, hauteur),
+    });
+    cage.userData.placer(decl.haut ?? 2.8);
   }
 
   for (const decor of chambre.decor ?? []) {
@@ -263,6 +326,7 @@ export function batir(chambre) {
     receptacles,
     terminaux,
     passerelles,
+    elevateurs,
     objets: poserObjets(chambre, groupe),
     eclairage,
     porte: {
@@ -355,6 +419,22 @@ export function boiteObjet(corps) {
  * porte donnerait sinon un bloc plein, et le joueur se cognerait à une ouverture
  * qu'il voit béante devant lui.
  */
+/**
+ * Boîte de collision d'un tablier d'élévateur, au format du moteur.
+ *
+ * Elle passe par `boiteDePlateforme`, qui est la formule que la physique
+ * utilise pour décider qui est porté. Une seconde formule ici donnerait un
+ * élévateur qu'on VOIT à un endroit et sur lequel on MARCHE à un autre — c'est
+ * la divergence qui avait fait pousser de l'herbe au-dessus du gouffre, et elle
+ * se reproduit à chaque fois qu'on recalcule une géométrie de son côté.
+ */
+function depuisBox3Plateforme(forme, hauteur) {
+  const b = boiteDePlateforme(forme, hauteur);
+  return depuisCentre(
+    (b.minX + b.maxX) / 2, (b.minY + b.maxY) / 2, (b.minZ + b.maxZ) / 2,
+    b.maxX - b.minX, b.maxY - b.minY, b.maxZ - b.minZ);
+}
+
 function ajouterColliders(piece, colliders) {
   piece.updateMatrixWorld(true);
   piece.traverse((noeud) => {

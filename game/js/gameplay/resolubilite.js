@@ -70,6 +70,13 @@ export function objetsCapables(besoin, catalogue) {
  * déploie.
  */
 function aplatirPasserelles(condition, passerelles) {
+  // `passerelles` porte ici TOUS les mécanismes dérivés — ponts horizontaux et
+  // élévateurs verticaux — parce qu'ils produisent des faits de la même façon.
+  // Ne pas y verser les élévateurs laissait `sortie: 'monte_charge'` non résolu :
+  // le nom était traité comme une instance de réceptacle, aucune combinaison ne
+  // le satisfaisait, et la salle était déclarée infinissable alors que sa zone
+  // d'arrivée était parfaitement atteignable — un message d'échec exact sur les
+  // symptômes et muet sur la cause.
   if (typeof condition === 'string') {
     const passerelle = passerelles.find((p) => p.id === condition);
     return passerelle
@@ -189,6 +196,18 @@ export function zonesAtteintes(salle, catalogue) {
     for (const passerelle of passerelles) {
       if (evaluer(passerelle.condition, faits)) faits.add(passerelle.id);
     }
+    // Un élévateur est une passerelle qui voyage vers le haut. Il produit donc
+    // un fait de la même façon, et le vérificateur n'a rien de nouveau à
+    // apprendre — c'était le but. Ce qui change est ailleurs, dans la physique :
+    // celui-là PORTE quelqu'un pendant qu'il bouge.
+    //
+    // L'oublier ici serait la faute de la salle 2 recommencée : une zone que le
+    // vérificateur déclare inatteignable alors qu'un mécanisme y mène, ou
+    // l'inverse. Les deux sens sont graves ; le second l'est davantage, parce
+    // qu'il annonce franchissable une salle qui ne l'est pas.
+    for (const lift of salle.elevateurs ?? []) {
+      if (evaluer(lift.condition, faits)) faits.add(lift.id);
+    }
 
     for (const [zone, condition] of Object.entries(salle.zones ?? {})) {
       if (atteintes.has(zone)) continue;
@@ -245,7 +264,9 @@ export function verifierSalle(salle, chercher) {
   // C'est seulement si la sortie en dépend que la salle est perdue, et la suite
   // le dira avec un message qui nomme la zone.
   const accessible = catalogue.filter((e) => atteintes.has(zoneDe(salle, e.nom)));
-  const sortie = aplatirPasserelles(salle.sortie ?? { toutes: [] }, salle.passerelles ?? []);
+  const sortie = aplatirPasserelles(
+    salle.sortie ?? { toutes: [] },
+    [...(salle.passerelles ?? []), ...(salle.elevateurs ?? [])]);
   const combinaisons = combinaisonsSatisfaisantes(sortie, instances);
   if (combinaisons.length === 0) {
     return echec(salle, horsAtteinte.length

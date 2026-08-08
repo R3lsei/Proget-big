@@ -31,6 +31,16 @@ export const ORIENTATIONS = Object.freeze({
 const MARGE_SEUIL = 0.35;
 
 /**
+ * Marge verticale du seuil, en mètres.
+ *
+ * Généreuse : le joueur peut franchir la porte en sautant, ou pendant les
+ * dernières dizaines de centimètres d'une plate-forme qui s'arrête. Trop
+ * serrée, la sortie ne se déclencherait qu'en marchant parfaitement à plat, ce
+ * qui donne l'impression d'une porte qui refuse de s'ouvrir sans raison.
+ */
+const MARGE_HAUTEUR_SEUIL = 1.1;
+
+/**
  * Flèche de la verrière courbe : de combien elle bombe vers le DEHORS.
  *
  * Vers le dehors, et c'est ce qui compte. Vue de l'intérieur, la paroi
@@ -202,7 +212,14 @@ export function seuilDe(chambre) {
   const { largeur, profondeur } = chambre.taille;
   const distance = ((murDeSortie === 'nord' || murDeSortie === 'sud')
     ? enMetres(profondeur) : enMetres(largeur)) / 2;
-  return { nx, nz, distance, ouverture: enMetres(chambre.porte?.ouverture ?? 2) };
+  return {
+    nx, nz, distance,
+    ouverture: enMetres(chambre.porte?.ouverture ?? 2),
+    // Hauteur du seuil. Zéro tant que la porte est au sol ; c'est la mezzanine
+    // qui la relève. Sans cette information, une salle verticale déclarerait la
+    // sortie franchie dès qu'on passe SOUS la porte, trois mètres plus bas.
+    y: chambre.porte?.y ?? 0,
+  };
 }
 
 /**
@@ -213,14 +230,19 @@ export function seuilDe(chambre) {
  * franchissement doit donc être constaté au moment même où il passe.
  */
 export function aFranchi(position, chambre) {
-  const { nx, nz, distance, ouverture } = seuilDe(chambre);
+  const { nx, nz, distance, ouverture, y } = seuilDe(chambre);
   const avance = position.x * nx + position.z * nz;
   if (avance < distance) return false;
   // Et par l'ouverture, pas à travers le mur : le long du mur, l'écart au centre
   // doit tenir dans la largeur de la porte. La marge couvre le rayon du joueur,
   // dont le centre reste en deçà du chambranle quand son corps le frôle.
   const lateral = Math.abs(position.x * -nz + position.z * nx);
-  return lateral <= ouverture / 2 + MARGE_SEUIL;
+  if (lateral > ouverture / 2 + MARGE_SEUIL) return false;
+  // ET à la bonne HAUTEUR. Dans une salle à un seul niveau la question ne se
+  // posait pas ; dès qu'une porte est perchée sur une mezzanine, un joueur qui
+  // passe dessous au rez-de-chaussée franchit exactement le même plan. Sans ce
+  // test, la salle 3 se terminerait en marchant sous la sortie.
+  return Math.abs((position.y ?? 0) - y) <= MARGE_HAUTEUR_SEUIL;
 }
 
 /**

@@ -88,6 +88,16 @@ const ouvertureDe = (chambre) => (chambre.porte?.ouverture ?? 2) * MODULE;
 /** Nombre de meubles visés par mètre linéaire de mur exploitable. */
 export const DENSITE_MOBILIER = 1.6;
 
+/**
+ * Plafond de meubles par salle, toutes familles confondues.
+ *
+ * Même raison que pour le semis : la densité au mètre linéaire est juste, et
+ * elle se retourne contre soi dès qu'une salle grandit. La halle en produisait
+ * soixante-deux, deux fois le compte des salles du tutoriel, pour un décor que
+ * le joueur ne voit jamais qu'en partie.
+ */
+export const PLAFOND_MOBILIER = 40;
+
 function hasard(graine) {
   let etat = (graine * 374761393) >>> 0;
   return () => {
@@ -208,7 +218,10 @@ export function meubler(chambre, { depart, graine = 11, densite = DENSITE_MOBILI
     }
     }
   }
-  return poses;
+  // Tronqué au plafond, et non tiré au sort dedans : les emplacements sont déjà
+  // répartis dans l'ordre des murs, donc couper à la fin retire proprement les
+  // derniers de chaque paroi plutôt que de trouer le meublage au hasard.
+  return poses.slice(0, PLAFOND_MOBILIER);
 }
 
 /**

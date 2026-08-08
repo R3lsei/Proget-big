@@ -1254,6 +1254,136 @@ export function fosse(gouffre) {
   return groupe;
 }
 
+/** Épaisseur du tablier d'une passerelle élévatrice, en mètres. */
+export const EPAISSEUR_ELEVATEUR = 0.16;
+
+/**
+ * Passerelle élévatrice : le même tablier, mais il voyage vers le HAUT.
+ *
+ * ─── Pourquoi ce n'est pas une passerelle ordinaire ─────────────────────────
+ *
+ * Sur le papier, si : même fait, même condition, même déverrouillage de zone —
+ * le vérificateur de résolubilité n'y voit que du feu, et c'est voulu, il ne
+ * doit pas apprendre un nouveau vocabulaire pour un mouvement différent.
+ *
+ * En physique, non. Une passerelle horizontale est immobile une fois sortie ;
+ * celle-ci PORTE quelqu'un pendant qu'elle bouge, ce qu'aucun obstacle du jeu
+ * n'avait jamais fait. Tout le travail est dans `physics/plateforme.js` ; ici
+ * on ne fabrique que la pièce.
+ *
+ * Deux montants latéraux la relient visuellement au haut et au bas de sa
+ * course. Sans eux, un tablier qui monte tout seul se lit comme un objet en
+ * lévitation, pas comme un ascenseur — et le joueur ne cherche pas à monter sur
+ * ce qui lévite.
+ */
+export function elevateur({
+  largeur = 2, longueur = 2, course = 2.8, etat = 'soigne',
+} = {}) {
+  const groupe = new THREE.Group();
+  groupe.name = `elevateur_${largeur}x${longueur}`;
+  const m = materiaux();
+
+  const l = largeur * MODULE;
+  const p = longueur * MODULE;
+
+  // Rails : ils montent jusqu'en haut de la course et ne bougent jamais. C'est
+  // eux qui annoncent le mouvement AVANT qu'il ait lieu — un joueur qui voit
+  // deux rails verticaux comprend en une seconde ce que fait la pièce posée
+  // entre eux, alors qu'un simple plateau au sol ne dit rien.
+  for (const signe of [-1, 1]) {
+    const rail = new THREE.Mesh(
+      new THREE.BoxGeometry(0.14, course + 0.6, 0.14), m.ossature);
+    rail.position.set(signe * (l / 2 + 0.12), (course + 0.6) / 2, 0);
+    rail.castShadow = true;
+    groupe.add(rail);
+  }
+
+  const tablier = new THREE.Group();
+  const pont = new THREE.Mesh(
+    new THREE.BoxGeometry(l, EPAISSEUR_ELEVATEUR, p),
+    etat === 'envahi' ? m.panneau_use : m.structure);
+  pont.position.y = -EPAISSEUR_ELEVATEUR / 2;
+  pont.castShadow = true;
+  pont.receiveShadow = true;
+  tablier.add(pont);
+
+  // Marquage de danger sur les deux bords libres du tablier : c'est un plancher
+  // sans garde-corps qui s'arrête à trois mètres du sol. Le même langage que
+  // pour la fosse, et pour la même raison — le bord est l'information vitale.
+  for (const signe of [-1, 1]) {
+    const bande = new THREE.Mesh(
+      new THREE.BoxGeometry(l, 0.014, 0.22), m.marquage_danger);
+    bande.position.set(0, 0.007, signe * (p / 2 - 0.11));
+    tablier.add(bande);
+  }
+  groupe.add(tablier);
+
+  /** Place le tablier à une hauteur donnée, en mètres. */
+  groupe.userData.placer = (hauteur) => { tablier.position.y = hauteur; };
+  groupe.userData.placer(0);
+  return groupe;
+}
+
+/**
+ * Mezzanine : un plancher perché, avec son garde-corps.
+ *
+ * Le garde-corps n'est pas de la décoration et il n'est pas non plus une
+ * barrière : il est laissé OUVERT côté élévateur. C'est la seule chose qui
+ * indique au joueur, depuis le rez-de-chaussée, par où l'on monte — et c'est
+ * moins cher qu'une flèche, plus honnête qu'un texte.
+ */
+export function mezzanine({
+  largeur = 6, profondeur = 3, hauteur = 2.8, etat = 'soigne', ouvertureX = null,
+} = {}) {
+  const groupe = new THREE.Group();
+  groupe.name = `mezzanine_${largeur}x${profondeur}`;
+  const m = materiaux();
+
+  const l = largeur * MODULE;
+  const p = profondeur * MODULE;
+  const EPAISSEUR_DALLE = 0.24;
+
+  const dalle = new THREE.Mesh(
+    new THREE.BoxGeometry(l, EPAISSEUR_DALLE, p),
+    etat === 'envahi' ? m.sol_terni : m.sol_poli);
+  dalle.position.y = hauteur - EPAISSEUR_DALLE / 2;
+  dalle.receiveShadow = true;
+  dalle.castShadow = true;
+  groupe.add(dalle);
+
+  // Sous-face : une dalle vue de dessous montre son carrelage à l'envers, ce
+  // qui ne se voit nulle part dans un bâtiment réel. On la coiffe d'un béton.
+  const sousFace = new THREE.Mesh(
+    new THREE.BoxGeometry(l, 0.06, p), m.sol_beton);
+  sousFace.position.y = hauteur - EPAISSEUR_DALLE - 0.02;
+  sousFace.receiveShadow = true;
+  groupe.add(sousFace);
+
+  // Garde-corps le long du bord libre, interrompu devant l'élévateur.
+  const HAUTEUR_GARDE = 1.05;
+  const segments = ouvertureX === null
+    ? [[-l / 2, l / 2]]
+    : [[-l / 2, ouvertureX[0]], [ouvertureX[1], l / 2]];
+  for (const [a, b] of segments) {
+    if (b - a < 0.15) continue;
+    const lisse = new THREE.Mesh(
+      new THREE.BoxGeometry(b - a, 0.06, 0.06), m.ossature);
+    lisse.position.set((a + b) / 2, hauteur + HAUTEUR_GARDE, p / 2 - 0.05);
+    lisse.castShadow = true;
+    groupe.add(lisse);
+    const nb = Math.max(2, Math.round((b - a) / 1.2));
+    for (let i = 0; i <= nb; i++) {
+      const montant = new THREE.Mesh(
+        new THREE.BoxGeometry(0.06, HAUTEUR_GARDE, 0.06), m.ossature);
+      montant.position.set(
+        a + ((b - a) * i) / nb, hauteur + HAUTEUR_GARDE / 2, p / 2 - 0.05);
+      montant.castShadow = true;
+      groupe.add(montant);
+    }
+  }
+  return groupe;
+}
+
 export function passerelle({ largeur = 2, longueur = 3, etat = 'soigne' } = {}) {
   const groupe = new THREE.Group();
   groupe.name = `passerelle_${largeur}x${longueur}`;

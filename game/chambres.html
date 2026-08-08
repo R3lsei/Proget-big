@@ -41,6 +41,18 @@
   #panne h1 { margin: 0 0 .8rem; font-size: 1.2rem; color: #ff9d85; }
   #panne code { background: #263034; padding: .1rem .4rem; border-radius: .2rem; }
   #panne p { margin: .7rem 0; }
+  /* Cinématique. Trois calques, et aucun n'intercepte la souris : passer la
+     séquence doit marcher au clic comme au clavier, et un calque qui capte les
+     événements bloquerait exactement ce qu'il faut pouvoir interrompre. */
+  #voile { position: fixed; inset: 0; background: #000; opacity: 0;
+           pointer-events: none; }
+  #eclair { position: fixed; inset: 0; background: #eaf6ff; opacity: 0;
+            pointer-events: none; }
+  #carton { position: fixed; inset: auto 0 22% 0; text-align: center;
+            font-size: 1.5rem; letter-spacing: .32em; color: #f2f6f7;
+            text-shadow: 0 2px 18px rgba(0,0,0,.9); pointer-events: none;
+            opacity: 0; transition: opacity .35s; }
+  #carton.visible { opacity: 1; }
   #chargement { position: fixed; inset: 0; display: grid; place-content: center;
                 background: #0b0d0e; color: #9fe8cd; letter-spacing: .04em; }
   #chargement.parti { display: none; }
@@ -55,6 +67,9 @@
 </div>
 <div id="etat"></div>
 <div id="hud">Cliquez pour commencer.</div>
+<div id="voile"></div>
+<div id="eclair"></div>
+<div id="carton"></div>
 
 <div id="scanner">
   <video id="scan-video" autoplay playsinline muted></video>
@@ -179,6 +194,26 @@ document.getElementById('chargement').classList.add('parti');
 
 const hud = document.getElementById('hud');
 const etat = document.getElementById('etat');
+
+// ─── Cinématique ────────────────────────────────────────────────────────────
+//
+// La partie ne connaît pas le DOM : elle appelle ce rappel avec ce qu'il faut
+// afficher, et c'est tout. Le calcul de la trajectoire, lui, est une fonction
+// pure vérifiée sous Node — c'est le même partage que pour les consignes, et
+// c'est ce qui permet de tester une caméra sans navigateur.
+const voile = document.getElementById('voile');
+const eclair = document.getElementById('eclair');
+const carton = document.getElementById('carton');
+partie.surCinematique = (vue) => {
+  voile.style.opacity = vue.voile;
+  eclair.style.opacity = vue.eclair;
+  carton.textContent = vue.texte;
+  carton.classList.toggle('visible', Boolean(vue.texte));
+};
+// Le clic passe la séquence, au même titre que n'importe quelle touche. Il est
+// posé AVANT la capture du pointeur : un joueur qui clique pour reprendre la
+// main ne doit pas avoir à cliquer deux fois.
+addEventListener('mousedown', () => partie.passerCinematique?.());
 
 // ─── Caméra ─────────────────────────────────────────────────────────────────
 const panneau = document.getElementById('scanner');

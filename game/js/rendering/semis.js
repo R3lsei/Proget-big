@@ -277,6 +277,14 @@ function empiete(zone, x, z, rayon) {
  * @param {number} [options.densite]  plantes tentées par m² ; défaut selon l'état
  * @returns {{espece:string,x:number,z:number,rotation:number,echelle:number}[]}
  */
+/**
+ * Nombre maximal de pousses semées dans une salle, quelle que soit sa surface.
+ *
+ * Cent cinquante. C'est le compte de la serre, qui est la salle la plus dense
+ * du jeu et que personne n'a trouvée vide.
+ */
+export const PLAFOND_SEMIS = 150;
+
 export function semer(chambre, { depart, graine = 7, densite } = {}) {
   const etat = chambre.etat ?? 'soigne';
   const { largeur, profondeur } = chambre.taille;
@@ -291,12 +299,32 @@ export function semer(chambre, { depart, graine = 7, densite } = {}) {
   const zones = interdits(chambre, depart);
 
   const surface = largeur * profondeur * MODULE * MODULE;
+  // ─── Un budget PAR SALLE, jamais par mètre carré ──────────────────────────
+  //
+  // La densité seule est une règle qui se retourne contre soi dès qu'une salle
+  // grandit : la halle de maintenance fait 242 m², soit deux fois et demie la
+  // salle de réveil, et le semis y produisait 444 pousses pour 74 — près de
+  // 480 000 triangles dans une seule chambre, quatre fois le reste du jeu.
+  //
+  // Or une salle deux fois plus grande n'a pas besoin de deux fois plus de
+  // verdure : le joueur n'en voit jamais qu'une portion à la fois, et au-delà
+  // d'un certain seuil chaque touffe supplémentaire ne fait qu'ajouter du coût.
+  // Le plafond est donc une décision de direction artistique autant que de
+  // performance — et une grande salle un peu plus dépouillée sert d'ailleurs la
+  // lecture de son volume.
   const tentatives = Math.round(surface * (densite ?? DENSITE[etat] ?? 0.3));
 
   const suivant = hasard(graine);
   const places = [];
 
   for (let i = 0; i < tentatives; i++) {
+    // Le plafond porte sur les pousses RETENUES, pas sur les tirages. Une
+    // première version bornait les tentatives, ce qui n'est pas la même chose
+    // du tout : la serre, très dense, en refuse neuf sur dix pour cause de
+    // chevauchement, et plafonner ses tirages lui a fait perdre les trois
+    // quarts de sa verdure d'un coup. Le taux de refus n'est pas une constante,
+    // il dépend de la salle — donc on compte ce qu'on garde.
+    if (places.length >= PLAFOND_SEMIS) break;
     // Tirage pondéré : l'herbe est commune, le rocher rare. Un tirage uniforme
     // donnerait autant de rochers que de brins d'herbe, ce qui ne ressemble à
     // aucun lieu réel.
