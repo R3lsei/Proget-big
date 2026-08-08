@@ -18,6 +18,43 @@
 Chacun de ces bugs doit avoir un test dédié. B-001 et B-014 sont verrouillés
 (T-003) ; B-002 et B-004 restent à couvrir (T-006).
 
+### B-033 · Plaques noires dans le ciel — **corrigé, après trois diagnostics faux**
+
+**Gravité : élevée.** Vu à travers la baie, le ciel n'était pas dégradé mais
+découpé : certains panneaux de verre montraient un désert clair, d'autres une
+masse brun sombre. Le défaut a survécu à toute une refonte de l'extérieur.
+
+**Cause réelle** : le dôme céleste a un rayon de 220 m ; le plan lointain de la
+caméra était à **200 m**. Le ciel était donc tranché par le plan de coupe, par
+plaques, selon la facette du dôme traversée — d'où l'apparence d'un problème de
+matériau, et non de caméra. Aucun des deux nombres n'était faux isolément :
+c'est leur ORDRE qui l'était, et rien ne l'exprimait.
+
+**Trois diagnostics faux avant celui-là**, tous plausibles, tous démentis :
+une dune trop proche, la sous-face de la verrière, la teinte du verre. Le
+troisième a même semblé se confirmer : remplacer la toiture vitrée par un
+plafond plein a fait disparaître la masse sombre — par accident, en changeant
+la tranche de ciel visible. **Un correctif qui marche n'est pas une preuve de
+diagnostic.**
+
+**Ce qui a tranché** — deux mesures, aucune observation :
+1. peindre le fond du rendu en vert faisait virer au vert les seuls pixels
+   sombres : donc rien n'y était dessiné, ce n'était pas une couleur mais une
+   ABSENCE ;
+2. porter le plan lointain à 400 m les rendait identiques aux pixels clairs.
+
+**Correction** : `PORTEE_VISION` est exportée par `dehors.js` — le module qui
+sait jusqu'où le monde s'étend — et la caméra du joueur comme la sonde de
+reflets s'en servent. La sonde était atteinte du même mal (portée 150 m) : elle
+capturait un ciel noir, et tout ce que le carrelage poli reflétait d'un peu haut
+s'en trouvait assombri. Un test vérifie l'ordre des trois rayons.
+
+**Leçon** : quand une surface est ABSENTE et non mal colorée, ce n'est jamais un
+problème de matière. Et un défaut visuel qui ressemble à un réglage d'aspect
+peut être un réglage de caméra — il faut mesurer le pixel, pas le regarder.
+
+---
+
 ### B-014 · Traversée d'obstacle sur déplacement long — **corrigé**
 **Gravité : moyenne.** Trouvé par les tests de T-003, pas en jeu.
 

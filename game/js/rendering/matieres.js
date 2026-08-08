@@ -178,6 +178,49 @@ export function motifPanneau({
 }
 
 /**
+ * Motif de sable : rides de vent et grain fin.
+ *
+ * Les rides sont ce qui distingue un désert d'un aplat ocre. Elles suivent une
+ * direction dominante — celle du vent — et c'est cette régularité orientée que
+ * l'œil lit comme « du sable » plutôt que comme « du bruit brun ».
+ */
+export function motifSable({
+  taille = 256, graine = 21, teinte = [201, 141, 85],
+} = {}) {
+  const couleur = new Uint8Array(taille * taille * 3);
+  const rugosite = new Uint8Array(taille * taille * 3);
+  const hauteur = new Float32Array(taille * taille);
+
+  for (let py = 0; py < taille; py++) {
+    for (let px = 0; px < taille; px++) {
+      const i = py * taille + px;
+      const u = px / taille; const v = py / taille;
+
+      // Rides : une sinusoïde le long d'une direction, ondulée par du bruit.
+      // Une sinusoïde pure donnerait des rayures de tissu ; c'est l'ondulation
+      // qui en fait du sable.
+      const derive = fractal(u * 3, v * 3, graine, 3) * 2.2;
+      const rides = Math.sin((u * 26 + v * 9 + derive) * Math.PI * 2) * 0.5 + 0.5;
+
+      const dunes = fractal(u * 4.5, v * 4.5, graine + 7, 4);
+      const grain = fractal(u * 40, v * 40, graine + 13, 2);
+
+      const valeur = 0.82 + rides * 0.14 + (dunes - 0.5) * 0.16 + (grain - 0.5) * 0.06;
+      for (let c = 0; c < 3; c++) {
+        couleur[i * 3 + c] = Math.max(0, Math.min(255, teinte[c] * valeur));
+      }
+
+      // Le sable ne renvoie rien : rugosité haute et presque constante.
+      const octet = Math.max(0, Math.min(255, (0.93 + grain * 0.06) * 255));
+      rugosite[i * 3] = octet; rugosite[i * 3 + 1] = octet; rugosite[i * 3 + 2] = octet;
+
+      hauteur[i] = rides * 0.35 + (grain - 0.5) * 0.15;
+    }
+  }
+  return { couleur, rugosite, normale: versNormales(hauteur, taille, 1.4), taille };
+}
+
+/**
  * Convertit un champ de hauteur en carte de normales tangentes.
  *
  * Par différences centrées, en bouclant sur les bords : une carte qui ne boucle

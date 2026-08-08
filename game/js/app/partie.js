@@ -22,7 +22,7 @@ import {
 import * as cocossd from '../perception/detecteurs/cocossd.js';
 import { batir, departDe, aFranchi } from '../rendering/batisseur.js';
 import { ambiance, clignotement, COULEUR_SPOT } from '../rendering/kit.js';
-import { dehors, soleilDeTempete, cieletSable } from '../rendering/dehors.js';
+import { dehors, soleilDeTempete, cieletSable, PORTEE_VISION } from '../rendering/dehors.js';
 import { creerComposeur, redimensionner } from '../rendering/posttraitement.js';
 import { semer } from '../rendering/semis.js';
 import { chargerEspece, planterSemis, chargerMeuble, poserMobilier } from '../rendering/vegetation.js';
@@ -71,8 +71,13 @@ export function demarrer(canvas, indexChambre = 0) {
   scene.add(cieletSable());
   scene.add(ambiance());
 
+  // La distance de vision vient du DEHORS, jamais d'un nombre écrit ici : c'est
+  // lui qui sait jusqu'où le monde s'étend. Réglée trop court — elle l'a été,
+  // à 200 m pour un ciel à 220 — la caméra tranche le dôme et laisse des trous
+  // noirs dans le ciel, un défaut qu'on met des semaines à attribuer à sa vraie
+  // cause parce qu'il ressemble à un problème de matière.
   const camera = new THREE.PerspectiveCamera(
-    72, (canvas.clientWidth || 1280) / (canvas.clientHeight || 720), 0.1, 200);
+    72, (canvas.clientWidth || 1280) / (canvas.clientHeight || 720), 0.1, PORTEE_VISION);
 
   // ─── Reflets ──────────────────────────────────────────────────────────────
   //
@@ -84,7 +89,12 @@ export function demarrer(canvas, indexChambre = 0) {
   // Capturée UNE fois par chambre, pas à chaque image : le décor ne bouge pas,
   // et six rendus de scène par image coûteraient plus cher que tout le reste.
   // Un reflet figé d'un décor figé est exact.
-  const sonde = new THREE.CubeCamera(0.3, 150,
+  // Même portée que la caméra du joueur, et pour la même raison : réglée à
+  // 150 m, la sonde tranchait le ciel et capturait du NOIR au-dessus de
+  // l'horizon. Tout ce que le carrelage poli et la vitre reflétaient d'un peu
+  // haut était alors assombri — un reflet faux ne se lit pas comme un bug, il
+  // se lit comme un mauvais éclairage, et on cherche des heures du mauvais côté.
+  const sonde = new THREE.CubeCamera(0.3, PORTEE_VISION,
     new THREE.WebGLCubeRenderTarget(256, {
       generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter,
     }));
