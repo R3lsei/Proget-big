@@ -411,7 +411,21 @@ export function poserMobilier(ameublement, meubles) {
     if (!modele) continue;
     const piece = modele.racine.clone(true);
     piece.scale.setScalar(modele.facteur);
-    piece.rotation.y = pose.rotation;
+    // ─── L'ORDRE des rotations, et pourquoi il décidait de tout ─────────────
+    //
+    // Un marquage mural est modelé À PLAT. Il faut donc le redresser (X) puis
+    // l'orienter vers son mur (Y). Le code posait `rotation.y` puis
+    // `rotation.x`, et l'ordre d'Euler par défaut (XYZ) compose R = Rx·Ry :
+    // le redressement s'appliquait EN DERNIER, dans le repère du monde. Quel
+    // que soit le mur, la normale finissait donc sur le même axe, et tous les
+    // panneaux regardaient le nord — de face sur un mur, de tranche sur les
+    // autres, où ils se lisaient comme des objets flottants.
+    //
+    // En 'YXZ', la composition devient R = Ry·Rx : on redresse dans le repère
+    // local, puis on tourne le tout. C'est l'ordre qu'il fallait, et il ne se
+    // devine pas à l'écran — un panneau mal orienté ressemble à un panneau mal
+    // POSÉ, et on va corriger sa position pendant des heures.
+    piece.rotation.set(pose.debout ? -Math.PI / 2 : 0, pose.rotation, 0, 'YXZ');
     // Le décalage de recentrage subit la rotation comme le reste du modèle.
     const decalage = new THREE.Vector3(
       modele.centreX * modele.facteur, 0, modele.centreZ * modele.facteur)
@@ -420,11 +434,6 @@ export function poserMobilier(ameublement, meubles) {
       pose.x + decalage.x,
       pose.y + modele.poserSurZero * modele.facteur,
       pose.z + decalage.z);
-    // Un marquage mural est modelé À PLAT, pour être posé au sol. Accroché tel
-    // quel il restait horizontal contre la cloison, donc invisible par la
-    // tranche : trois panneaux de signalétique étaient bien là, et ne se
-    // voyaient pas. On les redresse.
-    if (pose.debout) piece.rotation.x = -Math.PI / 2;
     piece.traverse((noeud) => {
       if (!noeud.isMesh) return;
       noeud.castShadow = true;

@@ -23,8 +23,9 @@ import {
   MODULE, HAUTEUR_CHAMBRE,
   sol, mur, murPerce, porte, paroiCourbe, plafondCaissons, lumiereSpot, COULEUR_SPOT,
   jardiniere, lierre, socleReceptacle, materiaux,
-  borneTerminal, passerelle,
+  borneTerminal, passerelle, fosse, panneauConsigne,
 } from './kit.js';
+import { mettreEnPage, placerConsigne } from './consigne.js';
 import {
   ORIENTATIONS, dallesDe, departDe, seuilDe, aFranchi, solPresent, solPorte, FLECHE_VERRIERE,
 } from './plan.js';
@@ -67,6 +68,20 @@ export function batir(chambre) {
     colliders.push(depuisCentre(
       dalle.x, -0.25, dalle.z,
       enMetres(dalle.largeur), 0.5, enMetres(dalle.profondeur)));
+  }
+
+  // Habillage du gouffre. Il n'en avait aucun : le vide était une absence de
+  // dalles, on voyait le sable du désert à travers le sol, et le joueur a lu
+  // cela comme un carrelage bogué plutôt que comme un trou. La mécanique
+  // fonctionnait parfaitement et n'était pas lisible — ce qui revient à ne pas
+  // exister.
+  if (chambre.gouffre) {
+    groupe.add(fosse({
+      xMin: enMetres(chambre.gouffre.xMin), xMax: enMetres(chambre.gouffre.xMax),
+      zMin: enMetres(chambre.gouffre.zMin), zMax: enMetres(chambre.gouffre.zMax),
+    }));
+    // Aucun collider : c'est un trou. Les parois sont là pour l'œil, et une
+    // paroi qui arrête le joueur transformerait la fosse en mur invisible.
   }
 
   const murDeSortie = chambre.porte?.mur ?? 'nord';
@@ -165,6 +180,17 @@ export function batir(chambre) {
   vantaux.rotation.y = ORIENTATIONS[murDeSortie].rotation;
   groupe.add(vantaux);
 
+  // Panneau de consigne, dans le champ de vision du départ. Le joueur a signalé
+  // que « le niveau est très mal expliqué » — et il l'était : rien, nulle part,
+  // ne lui disait qu'il pouvait montrer un objet réel à sa caméra.
+  if (chambre.consigne) {
+    const pose = placerConsigne(chambre, seuilDe(chambre));
+    const panneau = panneauConsigne(mettreEnPage(chambre.consigne));
+    panneau.position.set(pose.x, pose.y, pose.z);
+    panneau.rotation.y = pose.rotation;
+    groupe.add(panneau);
+  }
+
   const receptacles = new Map();
   for (const [instance, decl] of Object.entries(chambre.receptacles ?? {})) {
     const socle = socleReceptacle({ etat });
@@ -239,7 +265,28 @@ export function batir(chambre) {
     passerelles,
     objets: poserObjets(chambre, groupe),
     eclairage,
-    porte: { groupe: vantaux, ouvrir: vantaux.userData.ouvrir },
+    porte: {
+      groupe: vantaux,
+      ouvrir: vantaux.userData.ouvrir,
+      // Colliders des vantaux à une progression donnée, exprimés dans le repère
+      // du MONDE. Ils ne rejoignent pas `colliders` : cette liste est figée à la
+      // construction, et une porte bouge. C'est la boucle de jeu qui les ajoute,
+      // comme elle le fait déjà pour la passerelle déployée.
+      empreinte: (progression) => vantaux.userData.empreinte(progression)
+        .map(({ cx, cy, cz, largeur, hauteur, profondeur }) => {
+          // Rotation du mur de sortie, puis translation. Sans elle, une porte
+          // sur un mur est ou ouest aurait sa boîte en travers de la pièce.
+          const cos = Math.cos(ORIENTATIONS[murDeSortie].rotation);
+          const sin = Math.sin(ORIENTATIONS[murDeSortie].rotation);
+          return depuisCentre(
+            px * reculPorte + cx * cos + cz * sin,
+            cy,
+            pz * reculPorte - cx * sin + cz * cos,
+            Math.abs(cos) * largeur + Math.abs(sin) * profondeur,
+            hauteur,
+            Math.abs(sin) * largeur + Math.abs(cos) * profondeur);
+        }),
+    },
   };
 }
 

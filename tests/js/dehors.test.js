@@ -18,6 +18,7 @@ import assert from 'node:assert/strict';
 
 import {
   relief, implanter, terrain, formations, voiles, dehors, cielDeTempete,
+  grilleDeTerrain,
   RAYON_PLAT, EXCLUSION, PORTEE_FORMATIONS, PORTEE_VISION, DESERT,
 } from '../../game/js/rendering/dehors.js';
 
@@ -259,4 +260,70 @@ test('la brume laisse voir la tranche où vit le paysage', () => {
   assert.ok(facteur(12) > 0.97, 'la brume mord sur l\'intérieur de la salle');
   assert.ok(facteur(PORTEE_FORMATIONS * 0.6) > 0.25, 'les buttes sont noyées');
   assert.ok(facteur(300) < 0.05, 'la brume ne referme plus l\'horizon');
+});
+
+// ─── Le trou sous le laboratoire ────────────────────────────────────────────
+//
+// Le terrain est un plan de 340 m posé 35 cm sous le plancher : il passe donc
+// SOUS la salle, et il traversait le gouffre de la serre. On voyait le sable du
+// désert au fond d'une fosse de laboratoire, et le joueur a diagnostiqué « un
+// sol dupliqué » — l'intuition était juste, deux sols occupaient le même
+// endroit, simplement l'un venait du dehors. Aucun habillage de fosse n'y
+// pouvait rien : les parois étaient correctes, le sable arrivait avant elles.
+
+/** Le point (x, z) est-il recouvert par un triangle de la grille ? */
+function recouvert(grille, x, z) {
+  const { positions, indices } = grille;
+  const signe = (ax, az, bx, bz, cx, cz) => (ax - cx) * (bz - cz) - (bx - cx) * (az - cz);
+  for (let t = 0; t < indices.length; t += 3) {
+    const [a, b, c] = [indices[t], indices[t + 1], indices[t + 2]];
+    const ax = positions[a * 3]; const az = positions[a * 3 + 2];
+    const bx = positions[b * 3]; const bz = positions[b * 3 + 2];
+    const cx = positions[c * 3]; const cz = positions[c * 3 + 2];
+    const d1 = signe(x, z, ax, az, bx, bz);
+    const d2 = signe(x, z, bx, bz, cx, cz);
+    const d3 = signe(x, z, cx, cz, ax, az);
+    const negatif = d1 < 0 || d2 < 0 || d3 < 0;
+    const positif = d1 > 0 || d2 > 0 || d3 > 0;
+    if (!(negatif && positif)) return true;
+  }
+  return false;
+}
+
+const TROU = { xMin: -6, xMax: 6, zMin: -1.92, zMax: 0.48 };
+
+test('sans gouffre, le terrain est plein sous la salle', () => {
+  const grille = grilleDeTerrain({});
+  for (const [x, z] of [[0, 0], [3, -1], [-5, 0.2]]) {
+    assert.ok(recouvert(grille, x, z), `pas de sol en (${x}, ${z})`);
+  }
+});
+
+test('avec un gouffre, plus un seul triangle ne le recouvre', () => {
+  // La propriété qui manquait. Elle se teste, alors qu'un maillage ne se
+  // vérifie qu'à l'œil — et à l'œil, du sable orange au fond d'un trou
+  // ressemble à un défaut de texture, pas à deux sols superposés.
+  const grille = grilleDeTerrain({ trou: TROU });
+  for (const [x, z] of [[0, -0.7], [-5.5, -1.5], [5.5, 0.2], [0, 0.4], [0, -1.9]]) {
+    assert.ok(!recouvert(grille, x, z), `du sable subsiste en (${x}, ${z})`);
+  }
+});
+
+test('le trou ne déborde pas d\'un centimètre', () => {
+  // Un trou trop grand se voit BIEN PIRE qu'un trou absent : il ouvre une fente
+  // de désert au pied de la baie vitrée, là où le joueur regarde en premier.
+  const grille = grilleDeTerrain({ trou: TROU });
+  for (const [x, z] of [[0, 0.6], [0, -2.1], [6.2, -0.7], [-6.2, -0.7]]) {
+    assert.ok(recouvert(grille, x, z), `le trou déborde jusqu'en (${x}, ${z})`);
+  }
+});
+
+test('creuser ne coûte pas de triangles supplémentaires', () => {
+  // Insérer les bords du trou dans la grille ajoute des lignes, donc des
+  // mailles. Si cela faisait exploser le maillage, on aurait échangé un défaut
+  // visuel contre un défaut de performance — ce qui n'est pas un progrès.
+  const plein = grilleDeTerrain({}).indices.length;
+  const perce = grilleDeTerrain({ trou: TROU }).indices.length;
+  assert.ok(perce < plein * 1.08,
+    `${perce / 3} triangles percés contre ${plein / 3} pleins`);
 });

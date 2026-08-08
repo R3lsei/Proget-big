@@ -194,31 +194,111 @@ export function relief(x, z, graine = 5) {
 }
 
 /**
+ * Coordonnées d'un axe de la grille, avec les bords du trou insérés.
+ *
+ * Un pas régulier NE PEUT PAS tomber pile sur les bords d'un trou quelconque.
+ * On force donc ces bords dans la liste, et l'on subdivise l'intervalle entre
+ * eux au même pas que le reste : sans cette subdivision, la bande qui traverse
+ * le trou deviendrait une seule maille de douze mètres, visible comme une
+ * facette grossière au milieu des dunes.
+ */
+function coordonnees(demi, pas, borneMin, borneMax) {
+  const valeurs = new Set();
+  const n = Math.round((demi * 2) / pas);
+  for (let i = 0; i <= n; i++) valeurs.add(+(-demi + (i * demi * 2) / n).toFixed(4));
+  if (borneMin !== null && borneMax !== null) {
+    const m = Math.max(1, Math.round((borneMax - borneMin) / pas));
+    for (let i = 0; i <= m; i++) {
+      valeurs.add(+(borneMin + ((borneMax - borneMin) * i) / m).toFixed(4));
+    }
+  }
+  return [...valeurs].sort((a, b) => a - b);
+}
+
+/**
+ * La grille du terrain, en tableaux bruts — et le trou sous le laboratoire.
+ *
+ * ─── Pourquoi un trou, et pourquoi c'était invisible ────────────────────────
+ *
+ * Le terrain est un plan de 340 m posé à -0,35 m. Il passe donc SOUS le
+ * laboratoire, et il traversait le gouffre de la serre : en regardant dans la
+ * fosse on voyait, à trente-cinq centimètres, le sable du désert. Le joueur a
+ * signalé « un problème de sol, sûrement dû au fait qu'il soit dupliqué ». Ce
+ * n'était pas une duplication, et l'intuition était pourtant juste — deux sols
+ * occupaient bien le même endroit.
+ *
+ * Aucun habillage de fosse n'y pouvait rien : les parois étaient correctement
+ * bâties, simplement le sable arrivait AVANT elles sur le rayon. C'est le
+ * genre de défaut qu'on attribue au dernier module touché alors qu'il vient de
+ * l'interaction entre deux modules qui s'ignorent.
+ *
+ * Fonction PURE, et c'est ce qui la rend vérifiable : « aucun triangle ne
+ * recouvre l'intérieur du trou » est une propriété qui se teste, quand un
+ * maillage ne se teste qu'à l'œil.
+ *
+ * @param {object} options
+ * @param {{xMin:number,xMax:number,zMin:number,zMax:number}|null} options.trou  en mètres
+ */
+export function grilleDeTerrain({
+  etendue = ETENDUE, segments = SEGMENTS, trou = null, graine = 5,
+} = {}) {
+  const pas = etendue / segments;
+  const xs = coordonnees(etendue / 2, pas, trou?.xMin ?? null, trou?.xMax ?? null);
+  const zs = coordonnees(etendue / 2, pas, trou?.zMin ?? null, trou?.zMax ?? null);
+
+  const positions = new Float32Array(xs.length * zs.length * 3);
+  const uvs = new Float32Array(xs.length * zs.length * 2);
+  for (let j = 0; j < zs.length; j++) {
+    for (let i = 0; i < xs.length; i++) {
+      const k = j * xs.length + i;
+      positions[k * 3] = xs[i];
+      positions[k * 3 + 1] = relief(xs[i], zs[j], graine);
+      positions[k * 3 + 2] = zs[j];
+      uvs[k * 2] = xs[i] / etendue + 0.5;
+      uvs[k * 2 + 1] = zs[j] / etendue + 0.5;
+    }
+  }
+
+  const indices = [];
+  for (let j = 0; j < zs.length - 1; j++) {
+    for (let i = 0; i < xs.length - 1; i++) {
+      if (trou) {
+        // Le CENTRE de la maille décide. Les bords du trou étant des lignes de
+        // grille, aucune maille ne le chevauche : le test est donc exact, et le
+        // trou a la taille demandée au millimètre près.
+        const cx = (xs[i] + xs[i + 1]) / 2;
+        const cz = (zs[j] + zs[j + 1]) / 2;
+        if (cx > trou.xMin && cx < trou.xMax && cz > trou.zMin && cz < trou.zMax) continue;
+      }
+      const a = j * xs.length + i;
+      const b = a + 1;
+      const c = a + xs.length;
+      const d = c + 1;
+      indices.push(a, c, b, b, c, d);
+    }
+  }
+  return { positions, uvs, indices: new Uint32Array(indices), colonnes: xs.length };
+}
+
+/**
  * Le sol du désert : un seul maillage, déformé par `relief`.
  *
  * Un plan et non un disque : le carré déborde de la portée utile de la brume,
  * donc ses coins ne se voient pas, et une grille régulière se déforme sans
  * étirement — une géométrie polaire concentre ses sommets au centre, c'est-à-dire
  * exactement là où le terrain est plat et n'en a pas besoin.
+ *
+ * `creuser` refait la géométrie quand on change de chambre : le trou dépend du
+ * gouffre de la salle, et une salle sans gouffre n'en veut aucun. C'est le seul
+ * élément du dehors qui n'est pas construit une fois pour toutes, et il ne l'est
+ * qu'aux changements de chambre — jamais par image.
  */
-export function terrain({ graine = 5 } = {}) {
-  const geometrie = new THREE.PlaneGeometry(ETENDUE, ETENDUE, SEGMENTS, SEGMENTS);
-  geometrie.rotateX(-Math.PI / 2);
-
-  const sommets = geometrie.attributes.position;
-  for (let i = 0; i < sommets.count; i++) {
-    sommets.setY(i, relief(sommets.getX(i), sommets.getZ(i), graine));
-  }
-  sommets.needsUpdate = true;
-  // Recalculées APRÈS déformation : conserver les normales du plan d'origine
-  // laisserait toutes les dunes éclairées comme une surface horizontale, donc
-  // parfaitement invisibles quel que soit leur relief.
-  geometrie.computeVertexNormals();
-
-  const cartes = cartesDe(motifSable({ graine: 21 }), ETENDUE / 4);
-  const sol = new THREE.Mesh(geometrie, new THREE.MeshStandardMaterial({
-    ...cartes, color: DESERT.sol, roughness: 1, metalness: 0,
-  }));
+export function terrain({ graine = 5, trou = null } = {}) {
+  const materiau = new THREE.MeshStandardMaterial({
+    ...cartesDe(motifSable({ graine: 21 }), ETENDUE / 4),
+    color: DESERT.sol, roughness: 1, metalness: 0,
+  });
+  const sol = new THREE.Mesh(new THREE.BufferGeometry(), materiau);
   sol.name = 'terrain_desert';
   sol.position.y = ASSISE;
   // Ni porteur ni receveur d'ombre : la caméra d'ombre couvre vingt-six mètres,
@@ -226,6 +306,21 @@ export function terrain({ graine = 5 } = {}) {
   // coûterait un second rendu de dix-huit mille triangles pour zéro pixel.
   sol.castShadow = false;
   sol.receiveShadow = false;
+
+  sol.userData.creuser = (nouveauTrou) => {
+    const { positions, uvs, indices } = grilleDeTerrain({ graine, trou: nouveauTrou });
+    const geometrie = new THREE.BufferGeometry();
+    geometrie.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geometrie.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+    geometrie.setIndex(new THREE.BufferAttribute(indices, 1));
+    // Recalculées APRÈS déformation : conserver les normales d'un plan laisserait
+    // toutes les dunes éclairées comme une surface horizontale, donc parfaitement
+    // invisibles quel que soit leur relief.
+    geometrie.computeVertexNormals();
+    sol.geometry.dispose();
+    sol.geometry = geometrie;
+  };
+  sol.userData.creuser(trou);
   return sol;
 }
 
@@ -582,7 +677,8 @@ export function dehors({ graine = 5 } = {}) {
   groupe.name = 'dehors';
   const ciel = cielDeTempete();
   const rideaux = voiles();
-  groupe.add(ciel, terrain({ graine }), formations({ graine }), rideaux);
+  const sol = terrain({ graine });
+  groupe.add(ciel, sol, formations({ graine }), rideaux);
 
   // Brume exponentielle plutôt que linéaire : elle est négligeable sur les
   // douze mètres d'une chambre et écrasante à cent cinquante mètres. Une brume
@@ -596,6 +692,10 @@ export function dehors({ graine = 5 } = {}) {
       ciel.userData.animer(temps);
       rideaux.userData.animer(temps);
     },
+    // Appelée au chargement d'une chambre : le sable doit s'écarter là où la
+    // salle a un gouffre, sinon il affleure à trente-cinq centimètres dans le
+    // trou et l'on voit du désert au fond d'une fosse de laboratoire.
+    creuser: (trou) => sol.userData.creuser(trou),
   };
 }
 

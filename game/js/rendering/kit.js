@@ -14,7 +14,7 @@
 // appartiennent à `gameplay/`.
 
 import * as THREE from 'three';
-import { motifCarrelage, motifPanneau, cartesDe } from './matieres.js';
+import { motifCarrelage, motifPanneau, motifRayures, cartesDe } from './matieres.js';
 
 /** Pas de la grille, en mètres. Toute dimension en est un multiple. */
 export const MODULE = 1.2;
@@ -72,10 +72,43 @@ function creerMateriaux() {
       ...panneauUse,
     }),
     joint: panneau(0x9aa3a8, 0.9),
+    // Parement de fosse : du béton brut, jamais du carrelage. Une fosse
+    // technique carrelée se lirait comme une pièce en dessous, donc comme un
+    // endroit où l'on pourrait descendre — exactement ce qu'il ne faut pas
+    // suggérer d'un trou dont on ne remonte pas.
+    // La RÉPÉTITION n'est pas un réglage de finition : c'est elle qui donne son
+    // échelle à une surface. À trois répétitions sur les douze mètres d'une
+    // fosse, chaque panneau faisait quatre mètres de large, et le fond du trou
+    // se lisait comme une caisse posée dedans — on a cherché quel meuble
+    // flottait au-dessus du vide avant de comprendre qu'il n'y avait aucun
+    // meuble. Un motif à la mauvaise échelle ne paraît pas « mal texturé » : il
+    // paraît être un autre objet.
+    fosse: new THREE.MeshStandardMaterial({
+      color: 0x6e6a63, roughness: 1, metalness: 0, envMapIntensity: 0.18,
+      side: THREE.BackSide,
+      // Une émissive minuscule, et elle n'est pas décorative. Aucune lumière
+      // n'atteint le fond d'une fosse : les parois rendaient donc un noir
+      // absolu, sur lequel tout objet sombre placé DERRIÈRE se découpait en
+      // silhouette et paraissait flotter dans le trou. On a cherché longtemps
+      // quel meuble était mal posé — il n'y en avait aucun, c'était un coffre
+      // contre le mur du fond que le vide avalait. Un noir pur ne donne aucune
+      // profondeur : il supprime le plan sur lequel l'œil se repère.
+      emissive: 0x24211d, emissiveIntensity: 1,
+      ...cartesDe(motifPanneau({ salete: 1, graine: 23, teinte: [150, 146, 138] }), 11),
+    }),
+    // Quatorze répétitions sur un rail de douze mètres : des bandes de
+    // quatre-vingt-cinq centimètres. À six, elles faisaient deux mètres et ne
+    // ressemblaient plus à rien de connu ; à vingt-quatre, le filtrage les
+    // moyennait en un aplat orange dès trois mètres de recul — un marquage
+    // trop fin cesse d'être un marquage aussi sûrement qu'un marquage trop
+    // grossier.
+    marquage_danger: new THREE.MeshStandardMaterial({
+      color: 0xffffff, roughness: 0.7, metalness: 0.02, envMapIntensity: 0.4,
+      ...cartesDe(motifRayures({ graine: 41 }), 14),
+    }),
     structure: new THREE.MeshStandardMaterial({
       color: 0x2f3538, roughness: 0.45, metalness: 0.85, envMapIntensity: 0.6,
     }),
-    sol_carrelage: panneau(0xc3ccce, 0.45),
     // Ossature de verrière : CLAIRE, comme celle de toute serre réelle. En métal
     // sombre, les meneaux vus en enfilade — c'est-à-dire dès qu'on lève les yeux
     // — fusionnaient en une masse noire qui bouchait le ciel. Le défaut ne
@@ -905,9 +938,16 @@ export function porte({ ouverture = 2, hauteur = 2, etat = 'soigne' } = {}) {
 
   const vantaux = [];
   for (const signe of [-1, 1]) {
+    // PEINTE, pas polie. Les vantaux utilisaient `structure` — un métal à 0,85
+    // de métallicité — et un métal ne tire sa couleur que de ce qu'il reflète :
+    // dans une salle où la sonde d'environnement voit surtout du blanc mat, il
+    // rendait un NOIR d'encre. La porte se lisait comme un trou dans le mur, ce
+    // qui est exactement le contraire de ce qu'elle doit dire. Une porte de
+    // laboratoire est un panneau laqué ; c'est aussi la matière du mur qui
+    // l'entoure, donc elle s'y intègre au lieu de le trouer.
     const vantail = new THREE.Mesh(
       new THREE.BoxGeometry(ouverture * MODULE / 2 - 0.01, hauteur * MODULE, 0.1),
-      etat === 'envahi' ? m.panneau_use : m.structure);
+      etat === 'envahi' ? m.panneau_use : m.panneau_propre);
     vantail.position.set(signe * ouverture * MODULE / 4, hauteur * MODULE / 2, 0);
     vantail.castShadow = true;
     vantail.receiveShadow = true;
@@ -916,10 +956,43 @@ export function porte({ ouverture = 2, hauteur = 2, etat = 'soigne' } = {}) {
   }
 
   const course = ouverture * MODULE / 2;
+  const largeurVantail = ouverture * MODULE / 2 - 0.01;
   groupe.userData.ouvrir = (progression) => {
     const p = Math.min(1, Math.max(0, progression));
     vantaux[0].position.x = -ouverture * MODULE / 4 - course * p;
     vantaux[1].position.x = ouverture * MODULE / 4 + course * p;
+  };
+
+  /**
+   * Empreinte des deux vantaux, dans le repère LOCAL de la porte.
+   *
+   * La porte n'avait aucune collision. Aucune : ni trop fine, ni mal placée —
+   * absente. Le mur de sortie est percé, la porte bouche le percement à l'œil,
+   * et rien ne l'a jamais bouchée pour le corps du joueur, qui traversait donc
+   * une porte fermée et sortait d'une salle non résolue. Le bâtisseur appelait
+   * bien `ajouterColliders` pour chaque cloison, et jamais pour les vantaux.
+   *
+   * Rendue en fonction de la PROGRESSION plutôt qu'en boîte figée : une porte à
+   * moitié ouverte doit bloquer sa moitié. Un seuil « ouverte / fermée » aurait
+   * laissé passer le joueur pendant l'animation, ou l'aurait bloqué après.
+   *
+   * @param {number} progression 0 = fermée, 1 = ouverte
+   * @returns {{cx:number,cy:number,cz:number,largeur:number,hauteur:number,profondeur:number}[]}
+   */
+  groupe.userData.empreinte = (progression) => {
+    const p = Math.min(1, Math.max(0, progression));
+    return [-1, 1].map((signe) => ({
+      cx: signe * (ouverture * MODULE / 4 + course * p),
+      cy: hauteur * MODULE / 2,
+      cz: 0,
+      largeur: largeurVantail,
+      hauteur: hauteur * MODULE,
+      // Bien plus épaisse que les 10 cm du vantail : un pas de jeu peut valoir
+      // plusieurs centimètres, et une cloison plus fine que le déplacement d'une
+      // image se traverse sans jamais être touchée. C'est B-014, appliqué à une
+      // pièce mobile.
+      profondeur: 0.34,
+    }));
   };
   return groupe;
 }
@@ -1009,6 +1082,178 @@ export function borneTerminal({ etat = 'soigne' } = {}) {
  * à l'appelant, pour que l'état soit restituable exactement tel qu'une sauvegarde
  * l'a laissé.
  */
+/**
+ * Panneau de consigne : le tutoriel, accroché au mur.
+ *
+ * Le texte est peint dans un `canvas` — c'est la seule façon d'obtenir du texte
+ * net sans embarquer une police en maillage — puis posé sur une plaque. Tout ce
+ * qui se DÉCIDE (découpe des lignes, taille du panneau) vient de `consigne.js`,
+ * qui est pur et testé ; ici on ne fait que peindre.
+ *
+ * Le cadre est légèrement émissif. Ce n'est pas un effet : c'est ce qui range
+ * le panneau du bon côté de la règle que le joueur apprend en dix secondes —
+ * ce qui brille compte, ce qui est mat est du décor. Un panneau de consigne
+ * entièrement mat se serait fondu dans le mobilier, donc dans le bruit.
+ */
+export function panneauConsigne(page) {
+  const groupe = new THREE.Group();
+  groupe.name = 'consigne';
+  const m = materiaux();
+
+  const largeur = page.largeur;
+  const hauteur = page.hauteur;
+
+  // Plaque de fond, et un cadre qui déborde d'un centimètre : sans lui le
+  // panneau se lit comme un autocollant, avec lui comme un objet posé là.
+  const cadre = new THREE.Mesh(
+    new THREE.BoxGeometry(largeur + 0.05, hauteur + 0.05, 0.035), m.structure);
+  cadre.castShadow = true;
+  groupe.add(cadre);
+
+  const texture = texteEnTexture(page, largeur / hauteur);
+  const face = new THREE.Mesh(
+    new THREE.PlaneGeometry(largeur, hauteur),
+    new THREE.MeshStandardMaterial({
+      map: texture, roughness: 0.6, metalness: 0,
+      // Émissive à partir de la MÊME carte : les zones claires du panneau
+      // rayonnent, les zones sombres non. Une émissive uniforme aurait fait
+      // briller le fond noir autant que le texte, donc effacé le contraste.
+      emissiveMap: texture, emissive: 0xffffff, emissiveIntensity: 0.42,
+    }));
+  face.position.z = 0.019;
+  groupe.add(face);
+  return groupe;
+}
+
+/**
+ * Peint une page de consigne dans une texture.
+ *
+ * Isolée pour une raison : c'est le SEUL endroit du rendu qui exige un
+ * navigateur. Sous Node, `document` n'existe pas — on renvoie alors une texture
+ * unie plutôt que de lever, pour que les tests puissent bâtir une chambre
+ * entière sans WebGL ni DOM.
+ */
+function texteEnTexture(page, rapport) {
+  if (typeof document === 'undefined') {
+    return new THREE.DataTexture(new Uint8Array([30, 34, 36, 255]), 1, 1);
+  }
+  const H = 512;
+  const L = Math.round(H * rapport);
+  const toile = document.createElement('canvas');
+  toile.width = L; toile.height = H;
+  const c = toile.getContext('2d');
+
+  c.fillStyle = '#181b1d';
+  c.fillRect(0, 0, L, H);
+  // Bandeau de titre : c'est lui qui donne au panneau son air administratif,
+  // donc sa crédibilité dans un laboratoire.
+  c.fillStyle = '#d8a33a';
+  c.fillRect(0, 0, L, H * 0.16);
+
+  const marge = L * 0.06;
+  c.fillStyle = '#181b1d';
+  c.font = `bold ${Math.round(H * 0.085)}px sans-serif`;
+  c.textBaseline = 'middle';
+  c.fillText(page.titre, marge, H * 0.08);
+
+  c.fillStyle = '#f2f4f5';
+  const corps = Math.round(H * 0.072);
+  c.font = `${corps} px sans-serif`.replace(' px', 'px');
+  let y = H * 0.28;
+  for (const ligne of page.lignes) {
+    c.fillText(ligne, marge, y);
+    y += corps * 1.42;
+  }
+  if (page.rappel.length) {
+    // Le rappel des touches est SECONDAIRE : plus petit, plus gris, séparé par
+    // un filet. Au même niveau que la consigne, il la noierait — et c'est la
+    // consigne qui débloque la salle, pas la liste des commandes.
+    y += corps * 0.35;
+    c.fillStyle = '#4a5054';
+    c.fillRect(marge, y - corps * 0.6, L - marge * 2, 2);
+    y += corps * 0.35;
+    c.fillStyle = '#9aa3a8';
+    const petit = Math.round(H * 0.055);
+    c.font = `${petit}px sans-serif`;
+    for (const ligne of page.rappel) {
+      c.fillText(ligne, marge, y);
+      y += petit * 1.4;
+    }
+  }
+
+  const texture = new THREE.CanvasTexture(toile);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = 4;
+  return texture;
+}
+
+/** Profondeur d'une fosse, en mètres. Assez pour qu'on n'en voie pas le fond. */
+export const PROFONDEUR_FOSSE = 3.2;
+
+/** Largeur du marquage de danger de part et d'autre du vide, en mètres. */
+const LARGEUR_MARQUAGE = 0.34;
+
+/**
+ * Habillage d'un gouffre : les parois, le fond, et le marquage du bord.
+ *
+ * ─── Pourquoi ce module existe ──────────────────────────────────────────────
+ *
+ * Le gouffre n'était RIEN : une absence de dalles. Depuis la salle on voyait
+ * donc, à travers le sol, le sable du désert — et le joueur a lu cela comme un
+ * bug de carrelage, pas comme un trou. C'est le diagnostic le plus instructif de
+ * la séance : le vide était parfaitement fonctionnel, et parfaitement illisible.
+ * Une mécanique que le joueur ne reconnaît pas n'existe pas.
+ *
+ * Trois éléments, et chacun répond à une question du joueur :
+ *   les PAROIS      « jusqu'où ça descend ? » — sans elles, pas de profondeur ;
+ *   le FOND sombre  « qu'y a-t-il en bas ? » — rien, et c'est le message ;
+ *   le MARQUAGE     « où est le bord ? » — la seule information vitale.
+ *
+ * Les parois sont une boîte vue de l'INTÉRIEUR : une seule géométrie, douze
+ * triangles, un appel de dessin. Quatre murs séparés auraient coûté quatre fois
+ * plus pour un résultat identique, et auraient laissé des fentes aux angles.
+ *
+ * @param {{xMin:number,xMax:number,zMin:number,zMax:number}} gouffre  en mètres
+ */
+export function fosse(gouffre) {
+  const groupe = new THREE.Group();
+  groupe.name = 'fosse';
+  const m = materiaux();
+
+  const largeur = gouffre.xMax - gouffre.xMin;
+  const longueur = gouffre.zMax - gouffre.zMin;
+  const cx = (gouffre.xMin + gouffre.xMax) / 2;
+  const cz = (gouffre.zMin + gouffre.zMax) / 2;
+
+  // Débordement latéral de 20 cm : les extrémités du gouffre coïncident souvent
+  // au millimètre avec la face intérieure des murs de la salle, et deux surfaces
+  // coplanaires se disputent le même pixel — elles scintillent dès qu'on bouge.
+  // Enfoncer les bouts DANS le mur les met hors de vue et supprime la question.
+  const parois = new THREE.Mesh(
+    new THREE.BoxGeometry(largeur + 0.4, PROFONDEUR_FOSSE, longueur),
+    m.fosse);
+  parois.position.set(cx, -PROFONDEUR_FOSSE / 2 + 0.01, cz);
+  // Vue de dessus, la face du dessus tourne sa FACE AVANT vers nous : elle est
+  // donc éliminée, et l'on voit l'intérieur. C'est ce qui permet d'utiliser une
+  // boîte fermée pour ce qui doit rester ouvert.
+  parois.receiveShadow = true;
+  groupe.add(parois);
+
+  // Marquage du bord, sur les deux longs côtés. Posé À 1 cm au-dessus du sol :
+  // au même niveau que les dalles, il scintillerait contre elles.
+  for (const bord of [gouffre.zMin, gouffre.zMax]) {
+    const bande = new THREE.Mesh(
+      new THREE.BoxGeometry(largeur, 0.012, LARGEUR_MARQUAGE), m.marquage_danger);
+    // Décalé vers l'EXTÉRIEUR du gouffre : un marquage à cheval sur le vide
+    // n'aurait de peinture que sur la moitié qui touche encore le sol.
+    const sens = bord === gouffre.zMin ? -1 : 1;
+    bande.position.set(cx, 0.012, bord + sens * LARGEUR_MARQUAGE / 2);
+    bande.receiveShadow = true;
+    groupe.add(bande);
+  }
+  return groupe;
+}
+
 export function passerelle({ largeur = 2, longueur = 3, etat = 'soigne' } = {}) {
   const groupe = new THREE.Group();
   groupe.name = `passerelle_${largeur}x${longueur}`;

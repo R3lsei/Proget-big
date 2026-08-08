@@ -16,6 +16,8 @@ import {
   MAX_RECEPTACLES, objetsCapables, coupler, verifierSalle, verifierParcours,
   zonesAtteintes,
 } from '../../game/js/gameplay/resolubilite.js';
+import { solPresent } from '../../game/js/rendering/plan.js';
+import { enMetres } from '../../game/js/rendering/kit.js';
 
 const catalogue = (...noms) => noms.map(chercher);
 
@@ -407,4 +409,46 @@ test('la serre réelle est franchissable dans l\'ordre', () => {
   const atteintes = zonesAtteintes(serre, serre.objets.map(chercher));
   assert.ok(atteintes.has('plateforme'),
     'la plate-forme de la serre est hors d\'atteinte');
+});
+
+// ─── Ce que le vérificateur de résolubilité ne voyait pas ───────────────────
+//
+// Il raisonne sur les ZONES déclarées : telle plaque est « dans » la
+// plate-forme, la plate-forme exige le pont, donc le pont est nécessaire. Rien
+// ne l'oblige à regarder où les choses sont RÉELLEMENT. Une salle pouvait donc
+// être prouvée juste et bâtie fausse — c'est exactement le défaut qu'on avait
+// supprimé pour la végétation le jour du « herbe dans le vide », et qu'on
+// n'avait jamais appliqué aux mécanismes.
+
+test('tout mécanisme repose sur du sol', () => {
+  // Une console au-dessus du gouffre n'est pas une gêne de décor : elle est
+  // INATTEIGNABLE, et le joueur voit un objet flotter au milieu d'un trou.
+  for (const chambre of CHAMBRES) {
+    for (const [nom, decl] of Object.entries(chambre.receptacles ?? {})) {
+      assert.ok(solPresent(chambre, enMetres(decl.x ?? 0), enMetres(decl.z ?? 0)),
+        `${chambre.id} : le réceptacle ${nom} est au-dessus du vide`);
+    }
+    for (const [nom, decl] of Object.entries(chambre.terminaux ?? {})) {
+      assert.ok(solPresent(chambre, enMetres(decl.x ?? 0), enMetres(decl.z ?? 0)),
+        `${chambre.id} : le terminal ${nom} est au-dessus du vide`);
+    }
+  }
+});
+
+test('un mécanisme déclaré dans une zone y est vraiment', () => {
+  // La déclaration `dans` et les coordonnées disent la même chose ou le jeu
+  // ment. Les deux plaques de la serre étaient déclarées derrière le gouffre —
+  // donc « exigeant le pont » — et posées devant : le vérificateur prouvait une
+  // salle qui n'existait pas.
+  for (const chambre of CHAMBRES) {
+    if (!chambre.gouffre) continue;
+    const auDela = (z) => z < enMetres(chambre.gouffre.zMin);
+    for (const [nom, zone] of Object.entries(chambre.dans ?? {})) {
+      const decl = chambre.receptacles?.[nom] ?? chambre.terminaux?.[nom];
+      if (!decl) continue;
+      assert.equal(auDela(enMetres(decl.z ?? 0)), true,
+        `${chambre.id} : ${nom} est déclaré dans « ${zone} », donc au-delà du `
+        + 'gouffre, mais il est posé en deçà — on y accède sans le pont');
+    }
+  }
 });

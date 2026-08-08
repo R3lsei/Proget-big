@@ -23,7 +23,7 @@
 // placement se teste, un maillage non.
 
 import { MODULE } from './kit.js';
-import { ORIENTATIONS, solPorte } from './plan.js';
+import { ORIENTATIONS, solPresent } from './plan.js';
 import { interdits } from './semis.js';
 
 /**
@@ -79,6 +79,12 @@ const CONTRE_MUR_ACCROCHE = 0.09;
 /** Marge d'angle : un panneau à cheval sur deux murs déborde dans le vide. */
 const MARGE_ANGLE = 0.9;
 
+/** Dégagement de part et d'autre de la porte, en mètres : le passage reste libre. */
+const MARGE_PORTE = 0.5;
+
+/** Largeur de l'ouverture de sortie, en mètres. */
+const ouvertureDe = (chambre) => (chambre.porte?.ouverture ?? 2) * MODULE;
+
 /** Nombre de meubles visés par mètre linéaire de mur exploitable. */
 export const DENSITE_MOBILIER = 1.6;
 
@@ -107,10 +113,16 @@ export function meubler(chambre, { depart, graine = 11, densite = DENSITE_MOBILI
   const poses = [];
 
   for (const [orientation, { normale }] of Object.entries(ORIENTATIONS)) {
-    // Ni le mur vitré ni le mur de sortie : l'un est la vue, l'autre le chemin.
-    // Meubler devant l'un cacherait le désert, meubler devant l'autre
-    // encombrerait le seul passage — deux façons de gâcher ce qui compte.
-    if (orientation === murVitre || orientation === murDeSortie) continue;
+    // Le mur vitré reste nu : c'est la vue, et rien ne se met devant.
+    //
+    // Le mur de SORTIE, lui, était écarté en entier — et c'était trop. Une
+    // porte de 2,4 m dans une cloison de 12 en interdisait douze. Les salles se
+    // meublaient donc sur deux murs au lieu de trois, et le joueur l'a dit sans
+    // détour : « les salles sont vides ». Ce n'est pas la densité qu'il fallait
+    // monter, c'est la surface disponible qu'il fallait cesser de jeter. Seule
+    // l'ouverture est protégée, par la zone d'exclusion du seuil.
+    if (orientation === murVitre) continue;
+    const surLeMurDeSortie = orientation === murDeSortie;
 
     const [nx, nz] = normale;
     const murEnX = nx === 0;
@@ -118,14 +130,29 @@ export function meubler(chambre, { depart, graine = 11, densite = DENSITE_MOBILI
     const demiMur = (murEnX ? profondeur : largeur) * MODULE / 2;
     const emplacements = Math.max(1, Math.round(longueur * densite));
 
+    // ─── Deux passes, et c'est ce qui remplit vraiment une salle ─────────────
+    //
+    // Le sol et le mur tiraient au MÊME loto de places. Une bouche d'aération
+    // à 2,70 m interdisait donc la caisse qui serait allée sous elle, alors
+    // qu'elles ne se gênent en rien : elles ne sont pas à la même hauteur. La
+    // moitié des places partait ainsi à des objets qui n'occupent pas le sol,
+    // et la pièce restait nue là où le joueur regarde.
+    //
+    // Deux passes indépendantes doublent le remplissage sans toucher à la
+    // densité, et sans qu'aucune pièce n'en chevauche une autre : le test de
+    // recouvrement se fait DANS la famille, jamais entre les deux.
+    for (const famille of ['sol', 'mur']) {
+    const candidats = MEUBLES.filter((e) => e.pose === famille);
+    const total = candidats.reduce((s, e) => s + e.poids, 0);
+
     for (let i = 0; i < emplacements; i++) {
       // Réparti sur le mur, avec un décalage : un alignement parfait se lit
       // comme une grille, et une pièce rangée au cordeau contredit l'abandon.
       const glissement = (suivant() - 0.5) * (longueur / emplacements) * 0.7;
       const long = ((i + 0.5) / emplacements - 0.5) * longueur + glissement;
 
-      let reste = suivant() * MEUBLES.reduce((s, e) => s + e.poids, 0);
-      const choisi = MEUBLES.find((e) => (reste -= e.poids) <= 0) ?? MEUBLES[0];
+      let reste = suivant() * total;
+      const choisi = candidats.find((e) => (reste -= e.poids) <= 0) ?? candidats[0];
 
       const recul = demiMur
         - (choisi.pose === 'mur' ? CONTRE_MUR_ACCROCHE : CONTRE_MUR);
@@ -133,11 +160,37 @@ export function meubler(chambre, { depart, graine = 11, densite = DENSITE_MOBILI
       const z = murEnX ? nz * recul : long;
       const demi = choisi.largeur / 2;
 
+      // Devant la porte, rien. Ni au sol ni au mur : une bouche d'aération
+      // au-dessus d'une porte passe encore, un caisson accroché EN TRAVERS de
+      // l'ouverture est un mur qu'on ne comprend pas. La marge vaut le rayon du
+      // joueur en plus du demi-passage, pour qu'il n'ait pas à raser le montant.
+      if (surLeMurDeSortie
+        && Math.abs(long) < ouvertureDe(chambre) / 2 + demi + MARGE_PORTE) continue;
+
       // Un meuble au sol doit reposer sur du sol. Un meuble mural n'a pas cette
       // contrainte : il est accroché, il peut surplomber un gouffre.
-      if (choisi.pose === 'sol' && !solPorte(chambre, x, z, demi)) continue;
+      //
+      // ─── Pourquoi ce n'est pas `solPorte` ─────────────────────────────────
+      //
+      // `solPorte` exige que les QUATRE coins de l'empreinte soient sur une
+      // dalle. Or un meuble est plaqué contre un mur, et la dalle s'arrête AU
+      // mur : ses deux coins arrière débordent donc toujours — de quelques
+      // centimètres, à l'intérieur de la cloison, ce qui ne pose évidemment
+      // aucun problème. Le test refusait ainsi presque tout le mobilier posé.
+      // Deux salles entières se sont retrouvées avec deux meubles au sol
+      // chacune, et le joueur a signalé des « salles vides » qu'on a d'abord
+      // prises pour un manque de densité. Ce n'était pas la densité : c'était
+      // un garde-fou qui rejetait ce qu'il aurait dû accepter.
+      //
+      // On échantillonne donc VERS L'INTÉRIEUR et le long du mur, jamais vers
+      // le mur. Ce qui compte est qu'aucun meuble ne surplombe le gouffre, et
+      // cette vérification-là reste entière.
+      if (choisi.pose === 'sol' && !poseSurLeSol(chambre, x, z, demi, nx, nz)) continue;
       if (zones.some((zone) => empiete(zone, x, z, demi))) continue;
-      if (poses.some((p) => Math.hypot(p.x - x, p.z - z) < p.largeur / 2 + demi)) continue;
+      // Recouvrement DANS la famille seulement : un caisson au sol et une
+      // bouche d'aération au plafond peuvent partager la même verticale.
+      if (poses.some((p) => p.famille === famille
+        && Math.hypot(p.x - x, p.z - z) < p.largeur / 2 + demi)) continue;
 
       poses.push({
         meuble: choisi.nom,
@@ -150,10 +203,30 @@ export function meubler(chambre, { depart, graine = 11, densite = DENSITE_MOBILI
         largeur: choisi.largeur,
         hauteurVisee: choisi.hauteurVisee,
         debout: choisi.debout === true,
+        famille,
       });
+    }
     }
   }
   return poses;
+}
+
+/**
+ * Ce meuble repose-t-il sur du sol ?
+ *
+ * `nx, nz` est la normale du mur, qui pointe vers l'EXTÉRIEUR. On échantillonne
+ * le centre, les deux côtés le long du mur, et un point ramené vers l'intérieur.
+ * Jamais vers le mur : de ce côté-là, le débord est dans la cloison, pas dans le
+ * vide, et l'y interdire revient à interdire tout meuble adossé.
+ */
+function poseSurLeSol(chambre, x, z, demi, nx, nz) {
+  const points = [
+    [x, z],
+    [x - nz * demi, z + nx * demi],     // le long du mur, d'un côté
+    [x + nz * demi, z - nx * demi],     // et de l'autre
+    [x - nx * demi, z - nz * demi],     // vers l'intérieur de la pièce
+  ];
+  return points.every(([px, pz]) => solPresent(chambre, px, pz));
 }
 
 /** Reprise de la même formule que le semis : une zone ronde ou rectangulaire. */

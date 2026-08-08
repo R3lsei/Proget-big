@@ -221,6 +221,65 @@ export function motifSable({
 }
 
 /**
+ * Rayures de danger : le seul langage graphique que personne n'a besoin
+ * d'apprendre.
+ *
+ * Le gouffre de la serre se lisait comme un défaut d'affichage, pas comme un
+ * trou — on voyait le désert à travers le sol, et rien ne disait « bord ». Un
+ * marquage au sol règle cela sans un mot et sans une ligne d'interface : partout
+ * dans le monde réel, une diagonale jaune et noire veut dire « ne pas franchir ».
+ *
+ * Les rayures sont ÉCAILLÉES. Un marquage neuf dans un complexe abandonné
+ * depuis des décennies contredirait tout le reste du décor ; c'est l'usure qui
+ * dit depuis quand plus personne ne repeint.
+ *
+ * La diagonale est à 45°, donc `(u + v)` : c'est la seule pente qui boucle
+ * exactement sur les deux axes d'une texture carrée. À 30°, le raccord saute.
+ */
+export function motifRayures({
+  taille = 128, graine = 41, bandes = 6,
+  clair = [216, 163, 58], sombre = [38, 35, 31],
+} = {}) {
+  const couleur = new Uint8Array(taille * taille * 3);
+  const rugosite = new Uint8Array(taille * taille * 3);
+  const hauteur = new Float32Array(taille * taille);
+
+  for (let py = 0; py < taille; py++) {
+    for (let px = 0; px < taille; px++) {
+      const i = py * taille + px;
+      const u = px / taille; const v = py / taille;
+
+      const bande = ((u + v) * bandes) % 1;
+      const jaune = bande < 0.5;
+
+      // Écaillage : là où la peinture a sauté, c'est le béton qui apparaît, donc
+      // une teinte NEUTRE — pas une version sombre du jaune. Assombrir la
+      // couleur d'origine donne une salissure ; la remplacer donne une usure.
+      const usure = fractal(u * 9, v * 9, graine, 4);
+      const ecaille = usure < 0.42;
+      const grain = fractal(u * 34, v * 34, graine + 9, 2);
+
+      const base = jaune ? clair : sombre;
+      for (let c = 0; c < 3; c++) {
+        const beton = 138 + (grain - 0.5) * 30;
+        const peinte = base[c] * (0.86 + grain * 0.22);
+        couleur[i * 3 + c] = Math.max(0, Math.min(255,
+          ecaille ? beton : peinte));
+      }
+
+      // La peinture reste un peu satinée ; le béton mis à nu ne renvoie rien.
+      const octet = Math.max(0, Math.min(255, (ecaille ? 0.96 : 0.62) * 255));
+      rugosite[i * 3] = octet; rugosite[i * 3 + 1] = octet; rugosite[i * 3 + 2] = octet;
+
+      // La peinture a une épaisseur : c'est ce micro-relief qui accroche la
+      // lumière rasante et empêche le marquage de se lire comme un autocollant.
+      hauteur[i] = (ecaille ? 0 : 0.5) + (grain - 0.5) * 0.12;
+    }
+  }
+  return { couleur, rugosite, normale: versNormales(hauteur, taille, 1.8), taille };
+}
+
+/**
  * Convertit un champ de hauteur en carte de normales tangentes.
  *
  * Par différences centrées, en bouclant sur les bords : une carte qui ne boucle

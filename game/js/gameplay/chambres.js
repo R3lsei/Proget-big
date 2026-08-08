@@ -56,6 +56,24 @@ const REVEIL = {
   receptacles: {
     plaque: { type: 'plaque_pression', x: 0, z: -1.5 },
   },
+  // ─── La consigne, et pourquoi elle est aussi peu subtile ──────────────────
+  //
+  // NOVA-7 demande au joueur quelque chose qu'aucun jeu ne lui a jamais
+  // demandé : montrer un objet RÉEL à sa webcam. Aucune convention ne l'y
+  // prépare, aucune icône ne le suggère. On l'écrit donc en toutes lettres, dès
+  // la première salle, sur un panneau qui reste accroché au mur — un message
+  // qui s'efface ne sert qu'à ceux qui l'ont lu au bon moment.
+  //
+  // Le ton reste celui du lieu : une consigne de sécurité affichée par
+  // l'administration du complexe, pas une bulle d'aide. Elle explique la RÈGLE,
+  // jamais la solution — « un objet lourd », et le joueur cherche lequel.
+  consigne: {
+    titre: 'Sas de réveil — procédure',
+    corps: 'Posez un objet LOURD sur la plaque au sol. '
+      + 'La porte reste ouverte tant que la plaque est enfoncée.',
+    rappel: 'C : montrez un objet à votre caméra pour l\'ajouter à la sacoche. '
+      + 'E : prendre ou poser.',
+  },
   sortie: 'plaque',
   epreuves: [{ id: 'liens', affordance: 'couper' }],
   porte: { mur: 'nord', ouverture: 2 },
@@ -81,19 +99,37 @@ const SERRE = {
   // `tournevis` est conducteur et allongé : il ponte le boîtier. Aucun objet de
   // la salle n'est programmable — la console est donc la voie de qui montre un
   // téléphone à la caméra, le boîtier celle de qui n'en a pas.
+  // Tous du côté du départ, et à l'écart des terminaux : un objet posé au pied
+  // d'une console se ramasse par accident quand on veut l'activer.
   poses: {
-    brique: { x: -1.4, z: 2.2 },
-    'pot de fleurs': { x: 1.6, z: 2.4 },
-    tournevis: { x: 0.2, z: 1.2 },
-    arrosoir: { x: 3.6, z: 0.6 },
+    brique: { x: -1.4, z: 2.6 },
+    'pot de fleurs': { x: 1.6, z: 2.8 },
+    tournevis: { x: 0.2, z: 1.6 },
+    arrosoir: { x: 4.2, z: 3.0 },
   },
-  // La plate-forme du fond n'est atteignable qu'une fois le pont sorti. Les
-  // OUTILS qui sortent le pont doivent donc rester du côté du départ : les
-  // placer au-delà rendrait la salle impossible tout en la laissant « prouvée »
-  // par un vérificateur qui ignore l'espace.
-  // Le gouffre rend la séparation RÉELLE. Sans lui, les zones ne seraient que
-  // des mots et le joueur marcherait jusqu'aux plaques sur un sol plein.
-  gouffre: { xMin: -5, xMax: 5, zMin: -3.6, zMax: -1.6 },
+  // ─── Géométrie de la salle, et la faute qu'elle a portée longtemps ────────
+  //
+  // Coordonnées en MODULES ; la salle va de -4 à +4 en profondeur.
+  //
+  //     z = -4,0 … -1,6   plate-forme du fond : les plaques, puis la porte
+  //     z = -1,6 …  0,4   LE GOUFFRE, deux modules, franchi par le seul pont
+  //     z =  0,4 …  4,0   départ : les objets, les deux terminaux
+  //
+  // L'intention était écrite dans ces commentaires depuis le début ; la salle,
+  // elle, était bâtie autrement. Les plaques étaient déclarées « dans la
+  // plate-forme » — donc exigeant le pont — et posées à z = -0,8, en deçà du
+  // gouffre : on y marchait droit. Les DEUX terminaux, eux, étaient à z = -2,6,
+  // c'est-à-dire au-dessus du vide, donc suspendus dans le trou.
+  //
+  // Le vérificateur de résolubilité ne pouvait rien voir : il raisonne sur les
+  // zones DÉCLARÉES et jamais sur les coordonnées. La salle était prouvée juste
+  // et bâtie fausse. C'est mot pour mot le défaut supprimé pour la végétation le
+  // jour du « herbe dans le vide », et que personne n'avait appliqué aux
+  // mécanismes. Deux invariants le rendent maintenant impossible.
+  //
+  // La plate-forme du fond faisait par ailleurs 48 cm de profondeur, pour un
+  // joueur de 35 cm de rayon. Elle en fait 2,88 m.
+  gouffre: { xMin: -5, xMax: 5, zMin: -1.6, zMax: 0.4 },
   zones: {
     plateforme: 'pont',
   },
@@ -101,25 +137,54 @@ const SERRE = {
     plaque_gauche: 'plateforme',
     plaque_droite: 'plateforme',
   },
+  // Au-delà du gouffre : c'est ce qui rend le pont indispensable, et non
+  // seulement utile pour atteindre la porte.
   receptacles: {
-    plaque_gauche: { type: 'plaque_pression', x: -3, z: -0.8 },
-    plaque_droite: { type: 'plaque_pression', x: 3, z: -0.8 },
+    plaque_gauche: { type: 'plaque_pression', x: -3, z: -2.7 },
+    plaque_droite: { type: 'plaque_pression', x: 3, z: -2.7 },
   },
   terminaux: {
     // DEUX voies pour la même passerelle : la console demande de l'informatique,
     // le boîtier seulement de quoi ponter deux contacts. Un joueur sans appareil
     // programmable n'est donc jamais bloqué — c'est la règle des solutions
     // multiples appliquée au piratage.
-    console: { type: 'console_reseau', x: -4, z: -2.6 },
-    boitier: { type: 'boitier_commande', x: 4, z: -2.6 },
+    //
+    // Du côté du DÉPART, obligatoirement : ce sont eux qui sortent le pont. Les
+    // placer au-delà exigerait d'avoir déjà traversé pour pouvoir traverser.
+    console: { type: 'console_reseau', x: -3.4, z: 1.4 },
+    boitier: { type: 'boitier_commande', x: 3.4, z: 1.4 },
   },
   passerelles: [
     {
       id: 'pont',
-      x: 0, z: -2.6, largeur: 2, longueur: 2,
+      // Centré sur le gouffre, et de sa longueur exacte : un pont plus court
+      // laisse une marche dans le vide, un pont plus long empiète sur les dalles
+      // et se met à scintiller contre elles.
+      x: 0, z: -0.6, largeur: 2, longueur: 2,
       condition: { auMoins: ['console', 'boitier'] },
     },
   ],
+  // Deuxième salle, donc deuxième consigne — et c'est la dernière explicite.
+  // Elle enseigne la seule règle vraiment nouvelle ici : DEUX plaques en même
+  // temps, donc deux objets, donc on ne peut pas se contenter d'en porter un.
+  // Elle ne dit pas comment sortir le pont : les notes de service s'en chargent,
+  // et c'est là que le jeu commence à faire confiance au joueur.
+  consigne: {
+    titre: 'Serre — consignes de sécurité',
+    corps: 'Les DEUX plaques doivent rester enfoncées en même temps. '
+      + 'Franchissement de la fosse par passerelle uniquement.',
+    rappel: 'La passerelle se commande depuis un terminal de ce côté-ci.',
+  },
+  // Notes de service : la voie diégétique, qui prend le relais des consignes.
+  // Elles se lisent sur les terminaux, donc seulement si on les cherche — c'est
+  // ce qui les distingue du panneau, qu'on ne peut pas manquer. Le tutoriel
+  // enseigne, le journal récompense.
+  notes: {
+    console: 'JOURNAL — 12/09. Passerelle bloquée en position rentrée. '
+      + 'Déverrouillage logiciel possible depuis n\'importe quel terminal du réseau.',
+    boitier: 'ÉTIQUETTE — Commande manuelle. Ponter les deux contacts avec une '
+      + 'pièce métallique allongée en cas de coupure réseau.',
+  },
   // La sortie exige les deux plaques ET la passerelle : sans elle, les plaques
   // sont hors d'atteinte de l'autre côté du gouffre.
   sortie: { toutes: ['plaque_gauche', 'plaque_droite', 'pont'] },

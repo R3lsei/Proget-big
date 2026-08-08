@@ -21,7 +21,7 @@ import {
 } from '../perception/detecteur.js';
 import * as cocossd from '../perception/detecteurs/cocossd.js';
 import { batir, departDe, aFranchi } from '../rendering/batisseur.js';
-import { ambiance, clignotement, COULEUR_SPOT } from '../rendering/kit.js';
+import { ambiance, clignotement, COULEUR_SPOT, enMetres } from '../rendering/kit.js';
 import { dehors, soleilDeTempete, cieletSable, PORTEE_VISION } from '../rendering/dehors.js';
 import { creerComposeur, redimensionner } from '../rendering/posttraitement.js';
 import { semer } from '../rendering/semis.js';
@@ -239,6 +239,17 @@ export function demarrer(canvas, indexChambre = 0) {
     chambre = CHAMBRES[index];
     bati = batir(chambre);
     scene.add(bati.groupe);
+    // Le sable s'écarte sous le gouffre de la salle. Sans cela, le terrain du
+    // désert — un plan de 340 m posé à 35 cm sous le plancher — traverse la
+    // fosse, et l'on voit du sable orange au fond d'un trou de laboratoire. Le
+    // joueur avait raison de parler d'un « sol dupliqué » : deux sols
+    // occupaient bien le même endroit, simplement l'un venait du dehors.
+    exterieur.creuser(chambre.gouffre ? {
+      xMin: enMetres(chambre.gouffre.xMin),
+      xMax: enMetres(chambre.gouffre.xMax),
+      zMin: enMetres(chambre.gouffre.zMin),
+      zMax: enMetres(chambre.gouffre.zMax),
+    } : null);
     depart = departDe(chambre);
     verdir();
     joueur = creerJoueur(depart);
@@ -454,6 +465,12 @@ export function demarrer(canvas, indexChambre = 0) {
     for (const [id, pont] of bati.passerelles) {
       if ((pont.progression ?? 0) > 0.98) obstacles.push(pont.collider);
     }
+    // Les vantaux, à leur position du moment. La porte n'arrêtait PERSONNE : on
+    // sortait d'une salle non résolue en marchant droit dedans, ce qui rendait
+    // toutes les énigmes facultatives. Recalculés à chaque pas pour la même
+    // raison que le pont — une pièce qui bouge ne peut pas avoir de collision
+    // figée à la construction.
+    obstacles.push(...bati.porte.empreinte(etat.ouverture));
 
     avancer(joueur, intentions, obstacles, dt);
     majObjets(joueur, objets, obstacles, dt);

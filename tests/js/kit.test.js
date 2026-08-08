@@ -132,6 +132,12 @@ test('la palette tient en quatre familles', () => {
   // Le plafond reste bas et volontaire. Une palette qui enfle est le premier
   // symptôme d'une direction artistique qui se dilue, et chaque matière ajoutée
   // doit désormais déloger une famille entière, pas se glisser dans la liste.
+  //
+  // La règle a été appliquée : l'habillage du gouffre a demandé deux matières —
+  // le béton de fosse et le marquage de danger, qui fonde la famille
+  // SIGNALÉTIQUE — et le plafond n'a pas bougé d'un cran. C'est `sol_carrelage`
+  // qui a payé, parce qu'il n'était plus utilisé nulle part. Un test de plafond
+  // ne sert qu'à cela : forcer l'inventaire au lieu d'autoriser l'accumulation.
   assert.ok(Object.keys(materiaux()).length <= 15,
     `${Object.keys(materiaux()).length} matériaux : la palette se disperse`);
 });
