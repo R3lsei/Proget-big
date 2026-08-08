@@ -80,7 +80,16 @@ test('une zone envahie garde son carrelage, mais terni', () => {
   const poli = soigne.find((p) => p.isInstancedMesh).material;
   const terni = envahi.find((p) => p.isInstancedMesh).material;
   assert.notStrictEqual(poli, terni, 'même matière : l\'abandon ne se verrait pas');
-  assert.ok(terni.roughness > poli.roughness,
+  // La rugosité vit désormais dans une CARTE, pas dans un nombre : le champ
+  // `roughness` vaut 1 des deux côtés et ne dit plus rien. Comparer les deux
+  // scalaires passerait donc au vert quelle que soit la texture posée.
+  const moyenne = (materiau) => {
+    const octets = materiau.roughnessMap.image.data;
+    let somme = 0;
+    for (let i = 0; i < octets.length; i += 4) somme += octets[i];
+    return somme / (octets.length / 4);
+  };
+  assert.ok(moyenne(terni) > moyenne(poli),
     'le sol abandonné devrait moins renvoyer que le sol entretenu');
 });
 

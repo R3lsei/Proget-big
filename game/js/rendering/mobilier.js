@@ -47,7 +47,8 @@ export const MEUBLES = Object.freeze([
   { nom: 'caisse_2', fichier: 'models/mobilier/caisse-2.glb', pose: 'sol', hauteurVisee: 0.6, largeur: 0.8, poids: 5 },
   { nom: 'fut', fichier: 'models/mobilier/fut.glb', pose: 'sol', hauteurVisee: 1.0, largeur: 0.7, poids: 3 },
   { nom: 'colonne_conduits', fichier: 'models/mobilier/colonne-conduits.glb', pose: 'sol', hauteurVisee: 3.4, largeur: 0.9, poids: 2 },
-  { nom: 'ventilateur', fichier: 'models/mobilier/ventilateur.glb', pose: 'sol', hauteurVisee: 0.9, largeur: 0.8, poids: 2 },
+  // Le ventilateur est retiré du sol : c'est une pièce d'extraction, elle se
+  // fixe en hauteur, et posée au pied d'un mur elle ne ressemblait à rien.
 
   { nom: 'boitier_mural', fichier: 'models/mobilier/boitier-mural.glb', pose: 'mur', hauteurVisee: 0.55, hauteurPose: 1.5, largeur: 0.7, poids: 6 },
   { nom: 'bouche_large', fichier: 'models/mobilier/bouche-large.glb', pose: 'mur', hauteurVisee: 0.5, hauteurPose: 2.7, largeur: 1.1, poids: 4 },

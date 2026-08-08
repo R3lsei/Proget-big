@@ -14,6 +14,7 @@
 // appartiennent à `gameplay/`.
 
 import * as THREE from 'three';
+import { motifCarrelage, motifPanneau, cartesDe } from './matieres.js';
 
 /** Pas de la grille, en mètres. Toute dimension en est un multiple. */
 export const MODULE = 1.2;
@@ -45,9 +46,31 @@ function creerMateriaux() {
   const panneau = (couleur, rugosite) => new THREE.MeshStandardMaterial({
     color: couleur, roughness: rugosite, metalness: 0.02, envMapIntensity: 0.35,
   });
+
+  // Motifs calculés une seule fois pour toute la partie. Deux cent cinquante-six
+  // pixels de côté suffisent : ces surfaces sont vues de loin autant que de
+  // près, et la répétition règle le détail mieux que la résolution.
+  // UN seul carreau par texture. La géométrie porte déjà les carreaux — chaque
+  // dalle est un maillage distinct, avec ses UV de 0 à 1 — si bien qu'une
+  // texture à quatre carreaux par côté en dessinait seize sur CHAQUE dalle
+  // réelle. Le sol se retrouvait quadrillé deux fois, à deux échelles. La
+  // texture n'apporte donc que la salissure et le relief ; le découpage reste
+  // affaire de géométrie.
+  const carrelagePropre = cartesDe(motifCarrelage({ carreaux: 1, salete: 0.35, graine: 3 }), 1);
+  const carrelageSale = cartesDe(
+    motifCarrelage({ carreaux: 1, salete: 0.95, graine: 7, teinte: [206, 205, 196] }), 1);
+  const panneauPropre = cartesDe(motifPanneau({ salete: 0.3, graine: 9 }), 1);
+  const panneauUse = cartesDe(
+    motifPanneau({ salete: 0.95, graine: 13, teinte: [211, 210, 201] }), 1);
   return Object.freeze({
-    panneau_propre: panneau(0xeef1f2, 0.55),
-    panneau_use: panneau(0xd3d2c9, 0.85),
+    panneau_propre: new THREE.MeshStandardMaterial({
+      color: 0xffffff, roughness: 0.55, metalness: 0.02, envMapIntensity: 0.35,
+      ...panneauPropre,
+    }),
+    panneau_use: new THREE.MeshStandardMaterial({
+      color: 0xffffff, roughness: 0.85, metalness: 0.02, envMapIntensity: 0.3,
+      ...panneauUse,
+    }),
     joint: panneau(0x9aa3a8, 0.9),
     structure: new THREE.MeshStandardMaterial({
       color: 0x2f3538, roughness: 0.45, metalness: 0.85, envMapIntensity: 0.6,
@@ -79,13 +102,18 @@ function creerMateriaux() {
     // Carrelage du laboratoire : peu rugueux, donc il REND l'environnement.
     // C'est ce reflet qui fait entrer l'orange du dehors sur le sol blanc, et
     // qui lie les deux moitiés de l'image sans rien peindre.
+    // La COULEUR passe à blanc : c'est la carte qui porte désormais la teinte.
+    // La laisser colorée multiplierait la carte par elle-même et assombrirait
+    // tout d'un cran — l'erreur la plus discrète en posant une texture.
     sol_poli: new THREE.MeshStandardMaterial({
-      color: 0xe9edee, roughness: 0.14, metalness: 0.05, envMapIntensity: 1.6,
+      color: 0xffffff, roughness: 1, metalness: 0.05, envMapIntensity: 1.6,
+      ...carrelagePropre,
     }),
     // Le même carrelage, mais plus personne ne le lave : terne, mat, sans
     // reflet. C'est l'entretien qui distingue les deux états, pas la matière.
     sol_terni: new THREE.MeshStandardMaterial({
-      color: 0xc4c3ba, roughness: 0.62, metalness: 0.02, envMapIntensity: 0.5,
+      color: 0xffffff, roughness: 1, metalness: 0.02, envMapIntensity: 0.5,
+      ...carrelageSale,
     }),
     joint_sol: new THREE.MeshStandardMaterial({
       color: 0xaeb6b8, roughness: 0.5, metalness: 0.05, envMapIntensity: 0.8,

@@ -333,6 +333,12 @@ export function massif(espece, {
  * est un pari — c'est ce pari qui avait donné des fleurs plus larges qu'une
  * plaque de pression. La boîte englobante ne se trompe jamais.
  */
+/** Borne un décalage à l'échelle du modèle : au-delà, c'est une erreur. */
+function borner(valeur, echelle) {
+  const limite = echelle * 0.75;
+  return Math.max(-limite, Math.min(limite, valeur));
+}
+
 export async function chargerMeuble(descripteur, chargeur, base = '') {
   if (chargesMeubles.has(descripteur.nom)) return chargesMeubles.get(descripteur.nom);
   try {
@@ -371,8 +377,13 @@ export async function chargerMeuble(descripteur, chargeur, base = '') {
       // s'est retrouvé au milieu de la salle, le panneau de signalétique en
       // travers d'un angle. Ce n'était pas le placement qui était faux, c'était
       // le point par lequel on les tenait.
-      centreX: -(boite.min.x + boite.max.x) / 2,
-      centreZ: -(boite.min.z + boite.max.z) / 2,
+      // Borné à la demi-largeur du meuble. Un modèle dont l'origine est très
+      // loin de sa géométrie produirait sinon un décalage de plusieurs mètres,
+      // et la pièce partirait au milieu de la salle au lieu de rejoindre son
+      // mur — c'est ce qui ramenait le ventilateur au centre de la chambre.
+      // Recentrer doit corriger un défaut d'origine, jamais déplacer un meuble.
+      centreX: borner(-(boite.min.x + boite.max.x) / 2, hauteur),
+      centreZ: borner(-(boite.min.z + boite.max.z) / 2, hauteur),
     };
     chargesMeubles.set(descripteur.nom, charge);
     return charge;
