@@ -79,9 +79,11 @@ export const SEMABLES = Object.freeze([
   { espece: 'buisson', poids: 2, etats: ['envahi'], hauteurVisee: 0.80, empriseVisee: 0.85 },
   { espece: 'champignon', poids: 3, etats: ['envahi'], hauteurVisee: 0.16, empriseVisee: 0.20 },
 
-  // Le sable qui entre par les fissures : le dehors gagne aussi du terrain.
-  { espece: 'caillou_1', poids: 4, etats: ['envahi', 'soigne'], hauteurVisee: 0.10, empriseVisee: 0.28 },
-  { espece: 'caillou_2', poids: 4, etats: ['envahi', 'soigne'], hauteurVisee: 0.10, empriseVisee: 0.28 },
+  // PAS de cailloux ni de rochers. Ils avaient l'air d'avoir été semés à la
+  // main sur un sol propre, et c'est exactement ce qu'ils étaient. Un sol de
+  // laboratoire ne se couvre pas de galets : il se salit, et de la mousse s'y
+  // installe. La mousse et l'herbe des joints racontent l'abandon ; un caillou
+  // au milieu d'un carrelage ne raconte qu'un objet posé là.
 ]);
 
 /** Distance à garder autour d'un mécanisme, en mètres. */

@@ -68,14 +68,20 @@ test('le carrelage est instancié, pas répété maillage par maillage', () => {
   assert.ok(pieces.length < 12, `${pieces.length} maillages pour un sol : trop`);
 });
 
-test('une zone envahie a perdu son carrelage', () => {
-  // L'état du lieu doit se lire au sol autant qu'aux murs : le béton nu ne
-  // renvoie rien, le carrelage poli renvoie la tempête.
+test('une zone envahie garde son carrelage, mais terni', () => {
+  // Le joueur a signalé que la serre n'avait « pas de carrelage » : l'état
+  // envahi renvoyait du béton nu. C'est le même bâtiment — ce qui change est
+  // l'ENTRETIEN, pas la nature du sol. Un lieu abandonné garde ses matériaux,
+  // il cesse seulement de les laver.
   const soigne = maillages(sol({ largeur: 4, profondeur: 4, etat: 'soigne' }));
   const envahi = maillages(sol({ largeur: 4, profondeur: 4, etat: 'envahi' }));
-  assert.ok(soigne.length > envahi.length, 'le sol soigné devrait porter des carreaux');
-  assert.ok(soigne.some((p) => p.material.roughness < 0.3),
-    'aucune surface polie : le sol ne renverra rien');
+  assert.equal(soigne.length, envahi.length, 'les deux états devraient porter des carreaux');
+
+  const poli = soigne.find((p) => p.isInstancedMesh).material;
+  const terni = envahi.find((p) => p.isInstancedMesh).material;
+  assert.notStrictEqual(poli, terni, 'même matière : l\'abandon ne se verrait pas');
+  assert.ok(terni.roughness > poli.roughness,
+    'le sol abandonné devrait moins renvoyer que le sol entretenu');
 });
 
 // ─── Matériaux partagés ─────────────────────────────────────────────────────

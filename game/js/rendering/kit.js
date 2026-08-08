@@ -82,6 +82,11 @@ function creerMateriaux() {
     sol_poli: new THREE.MeshStandardMaterial({
       color: 0xe9edee, roughness: 0.14, metalness: 0.05, envMapIntensity: 1.6,
     }),
+    // Le même carrelage, mais plus personne ne le lave : terne, mat, sans
+    // reflet. C'est l'entretien qui distingue les deux états, pas la matière.
+    sol_terni: new THREE.MeshStandardMaterial({
+      color: 0xc4c3ba, roughness: 0.62, metalness: 0.02, envMapIntensity: 0.5,
+    }),
     joint_sol: new THREE.MeshStandardMaterial({
       color: 0xaeb6b8, roughness: 0.5, metalness: 0.05, envMapIntensity: 0.8,
     }),
@@ -211,9 +216,11 @@ export function sol({ largeur = 4, profondeur = 4, etat = 'soigne' } = {}) {
   fond.receiveShadow = true;
   groupe.add(fond);
 
-  // Une zone envahie a perdu son carrelage : béton nu, sans reflet. L'état du
-  // lieu doit se lire au sol autant qu'aux murs.
-  if (etat === 'envahi') return groupe;
+  // Une zone envahie garde son CARRELAGE — c'est le même bâtiment. Elle l'a
+  // seulement laissé se salir : plus terne, plus mat, moins de reflet. La
+  // première version renvoyait du béton nu, et la serre se retrouvait sans
+  // sol carrelé du tout alors que les références en montrent partout. L'état
+  // d'un lieu se lit à son ENTRETIEN, pas à son changement de nature.
 
   // Les carreaux ne sont pas alignés sur la grille des modules : deux carreaux
   // par module. Un carreau de 1,2 m se lirait comme une dalle de béton, pas
@@ -222,7 +229,8 @@ export function sol({ largeur = 4, profondeur = 4, etat = 'soigne' } = {}) {
   const carreau = new THREE.BoxGeometry(pas - JOINT * 2, 0.02, pas - JOINT * 2);
   const colonnes = Math.round(largeur * 2);
   const rangees = Math.round(profondeur * 2);
-  const carrelage = new THREE.InstancedMesh(carreau, m.sol_poli, colonnes * rangees);
+  const carrelage = new THREE.InstancedMesh(
+    carreau, etat === 'envahi' ? m.sol_terni : m.sol_poli, colonnes * rangees);
   carrelage.receiveShadow = true;
 
   const pose = new THREE.Object3D();

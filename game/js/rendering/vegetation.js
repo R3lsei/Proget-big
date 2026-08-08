@@ -365,6 +365,14 @@ export async function chargerMeuble(descripteur, chargeur, base = '') {
         (descripteur.largeur * 1.8) / Math.max(1e-3, Math.max(
           boite.max.x - boite.min.x, boite.max.z - boite.min.z))),
       poserSurZero: -boite.min.y,
+      // Recentrage horizontal. Ces modèles ont chacun leur origine où l'auteur
+      // l'a laissée — au coin, au centre de la pale, ailleurs. Posés par leur
+      // origine, ils atterrissaient à côté de leur emplacement : le ventilateur
+      // s'est retrouvé au milieu de la salle, le panneau de signalétique en
+      // travers d'un angle. Ce n'était pas le placement qui était faux, c'était
+      // le point par lequel on les tenait.
+      centreX: -(boite.min.x + boite.max.x) / 2,
+      centreZ: -(boite.min.z + boite.max.z) / 2,
     };
     chargesMeubles.set(descripteur.nom, charge);
     return charge;
@@ -392,8 +400,15 @@ export function poserMobilier(ameublement, meubles) {
     if (!modele) continue;
     const piece = modele.racine.clone(true);
     piece.scale.setScalar(modele.facteur);
-    piece.position.set(pose.x, pose.y + modele.poserSurZero * modele.facteur, pose.z);
     piece.rotation.y = pose.rotation;
+    // Le décalage de recentrage subit la rotation comme le reste du modèle.
+    const decalage = new THREE.Vector3(
+      modele.centreX * modele.facteur, 0, modele.centreZ * modele.facteur)
+      .applyAxisAngle(new THREE.Vector3(0, 1, 0), pose.rotation);
+    piece.position.set(
+      pose.x + decalage.x,
+      pose.y + modele.poserSurZero * modele.facteur,
+      pose.z + decalage.z);
     // Un marquage mural est modelé À PLAT, pour être posé au sol. Accroché tel
     // quel il restait horizontal contre la cloison, donc invisible par la
     // tranche : trois panneaux de signalétique étaient bien là, et ne se

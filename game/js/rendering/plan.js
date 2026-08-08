@@ -86,19 +86,48 @@ export function dallesDe(chambre) {
   return dalles;
 }
 
-/** Tablier de plancher sous la baie vitrée, s'il y en a une. */
+/** Nombre de bandes approchant la courbe du tablier de baie. */
+const BANDES_BAIE = 5;
+
+/**
+ * Tablier de plancher sous la baie vitrée, s'il y en a une.
+ *
+ * En BANDES qui suivent l'arc, pas en un seul rectangle. Un rectangle de la
+ * flèche entière dépassait la vitre aux extrémités — là où l'arc revient au
+ * plan du mur — et l'on voyait une corniche de carrelage blanc s'avancer dans
+ * le désert. Le joueur l'a vue tout de suite : « le sol qui déborde ».
+ *
+ * Cinq bandes suffisent : chacune ne dépasse que de la différence entre l'arc
+ * et sa corde, quelques centimètres, cachés sous l'allège du vitrage.
+ */
 function ajouterBaie(chambre, dalles) {
   if (!chambre.verriere) return;
   const { largeur, profondeur } = chambre.taille;
   const [nx, nz] = ORIENTATIONS[chambre.verriere].normale;
   const murEnX = nx === 0;   // mur nord ou sud : il court le long de X
   const recul = (murEnX ? enMetres(profondeur) : enMetres(largeur)) / 2;
-  dalles.push({
-    x: nx * (recul + FLECHE_VERRIERE / 2),
-    z: nz * (recul + FLECHE_VERRIERE / 2),
-    largeur: murEnX ? largeur : FLECHE_VERRIERE / MODULE,
-    profondeur: murEnX ? FLECHE_VERRIERE / MODULE : profondeur,
-  });
+  const longueur = (murEnX ? largeur : profondeur) * MODULE;
+
+  // Même arc que `paroiCourbe` : rayon déduit de la corde et de la flèche.
+  const rayon = (longueur * longueur / 4 + FLECHE_VERRIERE * FLECHE_VERRIERE)
+    / (2 * FLECHE_VERRIERE);
+  const centre = FLECHE_VERRIERE - rayon;
+
+  for (let i = 0; i < BANDES_BAIE; i++) {
+    const t = (i + 0.5) / BANDES_BAIE - 0.5;      // -0.5 … +0.5
+    const long = t * longueur;
+    // Profondeur de l'arc à cette abscisse : la bande ne va pas plus loin.
+    const profond = Math.max(0.05, centre + Math.sqrt(
+      Math.max(0, rayon * rayon - long * long)));
+    const large = longueur / BANDES_BAIE;
+    const avance = recul + profond / 2;
+    dalles.push({
+      x: (murEnX ? long : nx * avance),
+      z: (murEnX ? nz * avance : long),
+      largeur: (murEnX ? large : profond) / MODULE,
+      profondeur: (murEnX ? profond : large) / MODULE,
+    });
+  }
 }
 
 /**
