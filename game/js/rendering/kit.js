@@ -384,6 +384,185 @@ export function geometrieMousse({ rayon = 0.45, cotes = 11, graine = 1 } = {}) {
   return geometrie;
 }
 
+/**
+ * Paroi vitrée courbe : le mur qui ouvre sur le dehors.
+ *
+ * VERTICALE, et courbée en plan — pas une voûte au-dessus de la tête. La
+ * première version faisait arche par-dessus la pièce ; les références montrent
+ * une baie qui enveloppe le regard à hauteur d'homme, sous un plafond plat. La
+ * différence n'est pas décorative : une voûte se lit comme une serre horticole,
+ * une baie courbe se lit comme un poste d'observation. C'est un laboratoire.
+ *
+ * Elle bombe vers le DEHORS, de `fleche` mètres. Vue de l'intérieur elle est
+ * donc concave, et c'est cette concavité qui donne la sensation d'être au bord
+ * du monde. Le plancher qui la porte est ajouté par `plan.js`, qui sert aussi
+ * le semis — l'herbe pourra ainsi pousser le long de la vitre.
+ *
+ * @param {object} options
+ * @param {number} options.largeur  étendue du mur, en modules
+ * @param {number} options.fleche   bombement vers l'extérieur, en mètres
+ */
+export function paroiCourbe({
+  largeur = 8, hauteur = HAUTEUR_CHAMBRE, fleche = 1.2, segments = 9,
+} = {}) {
+  const groupe = new THREE.Group();
+  groupe.name = `paroi_courbe_${largeur}`;
+  const m = materiaux();
+
+  const corde = largeur * MODULE;
+  const haut = hauteur * MODULE;
+  // Rayon d'un arc de corde `corde` et de flèche `fleche`. Calculé, jamais
+  // choisi : un rayon écrit à la main ne passerait pas par les deux extrémités
+  // du mur, et la baie laisserait une fente à chaque angle de la pièce.
+  const rayon = (corde * corde / 4 + fleche * fleche) / (2 * fleche);
+  const centre = fleche - rayon;          // sur l'axe sortant, en local
+  const demiAngle = Math.asin(corde / (2 * rayon));
+  const pas = (demiAngle * 2) / segments;
+
+  const surArc = (angle) => new THREE.Vector3(
+    rayon * Math.sin(angle), 0, centre + rayon * Math.cos(angle));
+
+  // Panneaux plats tangents à l'arc. Facettés, comme toute verrière réelle :
+  // c'est le dégradé des reflets d'une facette à l'autre qui donne la courbe.
+  const largeurPanneau = 2 * rayon * Math.sin(pas / 2);
+  const vitrage = new THREE.InstancedMesh(
+    new THREE.PlaneGeometry(largeurPanneau, haut), m.verre, segments);
+  const montants = new THREE.InstancedMesh(
+    new THREE.BoxGeometry(0.07, haut, 0.12), m.ossature, segments + 1);
+  montants.castShadow = true;
+
+  const pose = new THREE.Object3D();
+  for (let i = 0; i < segments; i++) {
+    const angle = -demiAngle + (i + 0.5) * pas;
+    const point = surArc(angle);
+    pose.position.set(point.x, haut / 2, point.z);
+    pose.rotation.set(0, angle, 0);
+    pose.updateMatrix();
+    vitrage.setMatrixAt(i, pose.matrix);
+  }
+  for (let i = 0; i <= segments; i++) {
+    const angle = -demiAngle + i * pas;
+    const point = surArc(angle);
+    pose.position.set(point.x, haut / 2, point.z);
+    pose.rotation.set(0, angle, 0);
+    pose.updateMatrix();
+    montants.setMatrixAt(i, pose.matrix);
+  }
+  vitrage.instanceMatrix.needsUpdate = true;
+  montants.instanceMatrix.needsUpdate = true;
+  groupe.add(vitrage, montants);
+
+  // Allège au sol et bandeau en tête : sans eux, le verre semble flotter, et
+  // c'est cette allège que les références montrent envahie par l'herbe.
+  for (const [y, epaisseur] of [[0.09, 0.18], [haut - 0.09, 0.18]]) {
+    const bande = new THREE.InstancedMesh(
+      new THREE.BoxGeometry(largeurPanneau + 0.02, epaisseur, 0.16),
+      y < 1 ? materiauPanneau('soigne') : m.ossature, segments);
+    bande.castShadow = true;
+    bande.receiveShadow = true;
+    for (let i = 0; i < segments; i++) {
+      const angle = -demiAngle + (i + 0.5) * pas;
+      const point = surArc(angle);
+      pose.position.set(point.x, y, point.z);
+      pose.rotation.set(0, angle, 0);
+      pose.updateMatrix();
+      bande.setMatrixAt(i, pose.matrix);
+    }
+    bande.instanceMatrix.needsUpdate = true;
+    groupe.add(bande);
+  }
+
+  // Boîtes de collision : une par facette, suivant l'arc. Un seul mur droit
+  // laisserait le joueur traverser la vitre aux extrémités, là où l'arc s'en
+  // écarte le plus.
+  groupe.userData.colliders = [];
+  for (let i = 0; i < segments; i++) {
+    const angle = -demiAngle + (i + 0.5) * pas;
+    const point = surArc(angle);
+    groupe.userData.colliders.push({
+      x: point.x, z: point.z, angle,
+      largeur: largeurPanneau, hauteur: haut, epaisseur: 0.24,
+    });
+  }
+  return groupe;
+}
+
+/**
+ * Plafond à caissons, avec ses spots allumés.
+ *
+ * Les spots sont la seconde température de lumière, et c'est elle qui fait
+ * l'image : blanc froid au plafond contre orange de tempête à la vitre. Une
+ * scène à une seule température est plate quelle que soit sa géométrie — et
+ * c'est exactement ce que le jeu montrait, tout baigné dans le même ambre.
+ *
+ * Les disques sont émissifs ET accompagnés d'une vraie lumière : l'émissif seul
+ * donne des pastilles brillantes qui n'éclairent rien, la lumière seule donne
+ * des flaques au sol sans source visible. Il faut les deux pour que l'œil relie
+ * la cause à l'effet.
+ */
+export function plafondCaissons({ largeur = 8, profondeur = 8, etat = 'soigne' } = {}) {
+  const groupe = new THREE.Group();
+  groupe.name = `plafond_${largeur}x${profondeur}`;
+  const m = materiaux();
+
+  const dalle = new THREE.Mesh(
+    new THREE.BoxGeometry(largeur * MODULE, 0.14, profondeur * MODULE),
+    etat === 'envahi' ? m.panneau_use : m.panneau_propre);
+  dalle.position.y = 0.07;
+  dalle.receiveShadow = true;
+  groupe.add(dalle);
+
+  // Nervures : elles découpent le plafond en caissons et lui donnent l'échelle.
+  const nervure = new THREE.BoxGeometry(largeur * MODULE, 0.06, 0.05);
+  for (let i = 1; i < profondeur; i++) {
+    const barre = new THREE.Mesh(nervure, m.ossature);
+    barre.position.set(0, -0.02, (i - profondeur / 2) * MODULE);
+    groupe.add(barre);
+  }
+
+  // Spots répartis sur une grille explicite. La première version calculait ses
+  // bornes par divisions et planchers successifs : elle en produisait seize dans
+  // une salle de huit modules, et la pièce était entièrement cramée. Un compte
+  // décidé vaut mieux qu'un compte déduit — on voit ce qu'on obtient.
+  const rangeesX = Math.max(2, Math.round(largeur / 3));
+  const rangeesZ = Math.max(2, Math.round(profondeur / 3));
+  const disque = new THREE.CircleGeometry(0.17, 16);
+  const lampe = new THREE.MeshBasicMaterial({ color: COULEUR_SPOT.clone() });
+  groupe.userData.lampes = [];
+  for (let i = 0; i < rangeesX; i++) {
+    for (let j = 0; j < rangeesZ; j++) {
+      const x = ((i + 0.5) / rangeesX - 0.5) * largeur * MODULE;
+      const z = ((j + 0.5) / rangeesZ - 0.5) * profondeur * MODULE;
+      const verre = new THREE.Mesh(disque, lampe);
+      verre.position.set(x, -0.03, z);
+      verre.rotation.x = Math.PI / 2;
+      groupe.add(verre);
+      groupe.userData.lampes.push({ x, z });
+    }
+  }
+
+  return groupe;
+}
+
+/**
+ * Couleur d'un spot de plafond, hors de l'intervalle affichable.
+ *
+ * Franchement FROIDE face à l'orange du dehors. Un blanc neutre se noierait
+ * dans l'ambre général et l'on perdrait le contraste des deux mondes.
+ */
+const COULEUR_SPOT = new THREE.Color(0xdfeeff).multiplyScalar(2.2);
+
+/** Vraie lumière d'un spot : sans ombre, donc bon marché. */
+export function lumiereSpot(x, y, z) {
+  // Sans ombre portée : quatre à six spots par salle, chacun avec sa carte
+  // d'ombre, coûteraient plus cher que tout le reste de la chambre. Le soleil
+  // porte déjà les ombres qui comptent, celles de la verrière.
+  const lumiere = new THREE.PointLight(0xdfeeff, 2.2, 7, 2);
+  lumiere.position.set(x, y, z);
+  lumiere.castShadow = false;
+  return lumiere;
+}
+
 /** Jardinière : le végétal cultivé, celui du cœur entretenu. */
 export function jardiniere({ largeur = 2, etat = 'soigne' } = {}) {
   const groupe = new THREE.Group();

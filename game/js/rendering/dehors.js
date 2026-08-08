@@ -221,7 +221,7 @@ export function dehors({ graine = 5 } = {}) {
  * bas, donc le volume reste lisible. Une ambiante à la même intensité aurait
  * aplati toute la scène.
  */
-export function cieletSable({ intensite = 1.35 } = {}) {
+export function cieletSable({ intensite = 0.5 } = {}) {
   const lumiere = new THREE.HemisphereLight(DESERT.zenith, DESERT.sol, intensite);
   lumiere.name = 'ciel_et_sable';
   lumiere.position.set(0, 1, 0);
@@ -236,7 +236,10 @@ export function cieletSable({ intensite = 1.35 } = {}) {
  * ce que le soleil perd, sans quoi l'intérieur deviendrait illisible.
  */
 export function soleilDeTempete({ portee = 26 } = {}) {
-  const lumiere = new THREE.DirectionalLight(0xffbf7a, 2.4);
+  // Plus faible depuis que la toiture est pleine : le jour n'entre plus que par
+  // la baie. Une directionnelle réglée pour un plafond de verre écrase tout dès
+  // que le verre disparaît — l'exposition est un équilibre, pas une constante.
+  const lumiere = new THREE.DirectionalLight(0xffbf7a, 1.5);
   lumiere.name = 'soleil_tempete';
   lumiere.position.set(-9, 11, 6);
   lumiere.castShadow = true;

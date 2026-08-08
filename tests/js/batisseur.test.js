@@ -18,7 +18,8 @@ import { verifierParcours } from '../../game/js/gameplay/resolubilite.js';
 import { RECEPTACLES, activePar } from '../../game/js/gameplay/mecanismes.js';
 import { chercher } from '../../game/js/perception/base/index.js';
 import { seChevauchent, depuisCentre } from '../../game/js/physics/aabb.js';
-import { batir, departDe } from '../../game/js/rendering/batisseur.js';
+import { batir, departDe, solPresent } from '../../game/js/rendering/batisseur.js';
+import { ORIENTATIONS, FLECHE_VERRIERE } from '../../game/js/rendering/plan.js';
 import { MODULE, HAUTEUR_CHAMBRE, ETATS } from '../../game/js/rendering/kit.js';
 
 const GABARIT = { rayon: 0.3, hauteur: 1.7 };
@@ -203,13 +204,35 @@ test('la progression de la porte est bornée', () => {
 // ─── Emprise ────────────────────────────────────────────────────────────────
 
 test('la chambre bâtie tient dans les dimensions déclarées', () => {
+  // La BAIE VITRÉE fait exception, et c'est délibéré : elle bombe vers le
+  // dehors pour envelopper le joueur, donc elle sort du rectangle déclaré. On
+  // lui accorde exactement sa flèche, pas un centimètre de plus — sans quoi le
+  // test cesserait de protéger contre le vrai risque, une pièce dont la
+  // géométrie déborde silencieusement sur la salle voisine.
   for (const chambre of CHAMBRES) {
     const boite = new THREE.Box3().setFromObject(batir(chambre).groupe);
-    const marge = MODULE;
+    const surX = chambre.verriere === 'est' || chambre.verriere === 'ouest';
+    const marge = MODULE + (surX ? FLECHE_VERRIERE : 0);
     assert.ok(boite.max.x - boite.min.x <= chambre.taille.largeur * MODULE + marge,
       `${chambre.id} déborde en largeur`);
-    assert.ok(boite.max.y <= HAUTEUR_CHAMBRE * MODULE + marge,
+    assert.ok(boite.max.y <= HAUTEUR_CHAMBRE * MODULE + MODULE,
       `${chambre.id} dépasse en hauteur`);
+  }
+});
+
+test('la baie vitrée est portée par du plancher', () => {
+  // Elle bombe HORS du rectangle de la pièce : sans tablier dessous, le joueur
+  // qui s'approche de la vitre tomberait dans le vide, et la salle serait
+  // devenue un piège au nom d'un effet de mise en scène.
+  for (const chambre of CHAMBRES) {
+    if (!chambre.verriere) continue;
+    const [nx, nz] = ORIENTATIONS[chambre.verriere].normale;
+    const murEnX = nx === 0;
+    const recul = (murEnX ? chambre.taille.profondeur : chambre.taille.largeur) * MODULE / 2;
+    // Un point au milieu de la baie, au-delà du plan du mur d'origine.
+    const avance = recul + FLECHE_VERRIERE / 2;
+    assert.equal(solPresent(chambre, nx * avance, nz * avance), true,
+      `${chambre.id} : la baie surplombe le vide`);
   }
 });
 

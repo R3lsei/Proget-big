@@ -108,7 +108,35 @@ const MARGE_MUR = 0.35;
  * trois. Le centre reste dégagé — ce qui sert aussi le jeu, puisque c'est là
  * que se joue l'énigme.
  */
-const PORTEE_COLONISATION = 0.95;
+const PORTEE_COLONISATION = 1.6;
+
+/**
+ * Pas du carrelage, en mètres. Deux carreaux par module, comme `sol()`.
+ *
+ * Les références montrent l'herbe poussant DANS LES JOINTS, en lignes fines qui
+ * suivent la grille sur toute la surface. C'est plus juste qu'un semis libre :
+ * un carrelage n'a pas d'autre faiblesse que ses joints, et c'est par là que
+ * l'eau passe et que les graines s'installent. C'est aussi ce qui se lit
+ * instantanément — une trame régulière dit « sol carrelé abandonné » là où des
+ * touffes dispersées ne disent rien.
+ */
+const PAS_CARREAU = MODULE / 2;
+
+/**
+ * Ramène un point sur le joint le plus proche.
+ *
+ * Sur UN seul axe, celui dont on est le plus près : la pousse s'aligne alors le
+ * long d'une ligne de joint et garde sa liberté dans l'autre sens. Aligner les
+ * deux axes la clouerait aux intersections, et l'on obtiendrait une grille de
+ * points régulière — un damier, pas une friche.
+ */
+function surJoint(x, z) {
+  const jointX = Math.round(x / PAS_CARREAU) * PAS_CARREAU;
+  const jointZ = Math.round(z / PAS_CARREAU) * PAS_CARREAU;
+  return Math.abs(x - jointX) <= Math.abs(z - jointZ)
+    ? { x: jointX, z }
+    : { x, z: jointZ };
+}
 
 /**
  * Variation de taille d'une plante à l'autre. Exportée pour que les tests
@@ -273,8 +301,9 @@ export function semer(chambre, { depart, graine = 7, densite } = {}) {
     let reste = suivant() * poidsTotal;
     const choisi = catalogue.find((e) => (reste -= e.poids) <= 0) ?? catalogue[0];
 
-    const x = (suivant() * 2 - 1) * demiX;
-    const z = (suivant() * 2 - 1) * demiZ;
+    const tire = surJoint((suivant() * 2 - 1) * demiX, (suivant() * 2 - 1) * demiZ);
+    const x = tire.x;
+    const z = tire.z;
     const forme = gabarit(choisi);
     if (!forme) continue;   // espèce sans modèle mesuré : on ne devine pas
     const variation = VARIATION.min + suivant() * (VARIATION.max - VARIATION.min);
@@ -284,7 +313,12 @@ export function semer(chambre, { depart, graine = 7, densite } = {}) {
     // 1. La colonisation part des bords. Un tirage au sort pondéré par la
     //    distance à la paroi la plus proche : contre un mur, presque toujours ;
     //    au centre de la pièce, presque jamais.
-    if (suivant() > Math.exp(-distanceAuBord(chambre, x, z) / PORTEE_COLONISATION)) continue;
+    // La friche part des bords, mais ne s'y limite plus : les joints portent
+    // partout, simplement moins densément loin des parois. Une décroissance
+    // pure laissait le centre entièrement nu, ce que les références démentent —
+    // on y voit de l'herbe jusqu'au milieu de la salle, dans les joints.
+    const proche = Math.exp(-distanceAuBord(chambre, x, z) / PORTEE_COLONISATION);
+    if (suivant() > 0.35 + 0.65 * proche) continue;
     // 2. Du sol sous TOUTE l'emprise. C'est la règle qui manquait.
     if (!solPorte(chambre, x, z, rayon)) continue;
     // 3. Dans la pièce, en gardant le dégagement des cloisons.

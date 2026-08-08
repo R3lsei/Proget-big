@@ -31,6 +31,22 @@ export const ORIENTATIONS = Object.freeze({
 const MARGE_SEUIL = 0.35;
 
 /**
+ * Flèche de la verrière courbe : de combien elle bombe vers le DEHORS.
+ *
+ * Vers le dehors, et c'est ce qui compte. Vue de l'intérieur, la paroi
+ * enveloppe alors le joueur — c'est cette concavité qui donne la sensation de
+ * baie vitrée des références. Bombée vers l'intérieur elle aurait été plus
+ * simple (le plancher existant l'aurait couverte) mais elle se serait lue comme
+ * une bosse au milieu de la pièce, exactement l'inverse.
+ *
+ * Le plancher doit donc s'étendre sous la baie. C'est fait ICI, dans les dalles,
+ * et pas seulement dans le bâtisseur : le semis lit les mêmes dalles, et il
+ * pourra donc faire pousser de l'herbe le long de la vitre — ce que montrent les
+ * références — sans qu'on ait à l'y autoriser à part.
+ */
+export const FLECHE_VERRIERE = 1.2;
+
+/**
  * Découpe le sol en dalles autour du gouffre.
  *
  * Le gouffre n'est pas un décor : c'est l'absence de plancher qui rend la
@@ -44,7 +60,11 @@ const MARGE_SEUIL = 0.35;
 export function dallesDe(chambre) {
   const { largeur, profondeur } = chambre.taille;
   const gouffre = chambre.gouffre;
-  if (!gouffre) return [{ x: 0, z: 0, largeur, profondeur }];
+  if (!gouffre) {
+    const dalles = [{ x: 0, z: 0, largeur, profondeur }];
+    ajouterBaie(chambre, dalles);
+    return dalles;
+  }
 
   const dalles = [];
   const avant = gouffre.zMin + profondeur / 2;
@@ -61,6 +81,37 @@ export function dallesDe(chambre) {
       largeur, profondeur: arriere,
     });
   }
+  decoupeGouffre(chambre, dalles);
+  ajouterBaie(chambre, dalles);
+  return dalles;
+}
+
+/** Tablier de plancher sous la baie vitrée, s'il y en a une. */
+function ajouterBaie(chambre, dalles) {
+  if (!chambre.verriere) return;
+  const { largeur, profondeur } = chambre.taille;
+  const [nx, nz] = ORIENTATIONS[chambre.verriere].normale;
+  const murEnX = nx === 0;   // mur nord ou sud : il court le long de X
+  const recul = (murEnX ? enMetres(profondeur) : enMetres(largeur)) / 2;
+  dalles.push({
+    x: nx * (recul + FLECHE_VERRIERE / 2),
+    z: nz * (recul + FLECHE_VERRIERE / 2),
+    largeur: murEnX ? largeur : FLECHE_VERRIERE / MODULE,
+    profondeur: murEnX ? FLECHE_VERRIERE / MODULE : profondeur,
+  });
+}
+
+/**
+ * Dalles latérales : le gouffre ne barre pas toujours toute la largeur.
+ *
+ * Extraite lors de l'ajout de la baie vitrée, et l'extraction a bien failli
+ * coûter cher — la fonction s'est retrouvée orpheline, jamais appelée. Les deux
+ * chambres actuelles ont un gouffre qui traverse toute la pièce, donc rien ne
+ * se voyait ; c'est le test au gouffre déplacé qui l'aurait attrapé.
+ */
+function decoupeGouffre(chambre, dalles) {
+  const { largeur, profondeur } = chambre.taille;
+  const gouffre = chambre.gouffre;
   const gauche = gouffre.xMin + largeur / 2;
   const droite = largeur / 2 - gouffre.xMax;
   const profondeurGouffre = gouffre.zMax - gouffre.zMin;
@@ -78,7 +129,6 @@ export function dallesDe(chambre) {
       largeur: droite, profondeur: profondeurGouffre,
     });
   }
-  return dalles;
 }
 
 /** Le point (mètres) tombe-t-il sur cette dalle ? */
