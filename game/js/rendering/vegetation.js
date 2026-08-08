@@ -353,9 +353,16 @@ export async function chargerMeuble(descripteur, chargeur, base = '') {
       // quarante-cinq était gonflé vingt-deux fois et barrait la salle. Le
       // même piège, à trois semaines d'intervalle, parce que la leçon était
       // dans un commentaire au lieu d'être dans le code partagé.
+      // La HAUTEUR commande, la largeur ne fait que garde-fou. Contraindre les
+      // deux à égalité écrasait les meubles à soixante centimètres : un modèle
+      // large et bas voyait sa largeur décider, et la console de laboratoire
+      // arrivait à hauteur de genou. La tolérance de 1,8 laisse chaque meuble
+      // atteindre sa taille voulue, tout en rattrapant le cas extrême — un
+      // décal de deux centimètres d'épaisseur, que la seule hauteur gonflait
+      // vingt-deux fois.
       facteur: Math.min(
         descripteur.hauteurVisee / hauteur,
-        descripteur.largeur / Math.max(1e-3, Math.max(
+        (descripteur.largeur * 1.8) / Math.max(1e-3, Math.max(
           boite.max.x - boite.min.x, boite.max.z - boite.min.z))),
       poserSurZero: -boite.min.y,
     };
@@ -387,6 +394,11 @@ export function poserMobilier(ameublement, meubles) {
     piece.scale.setScalar(modele.facteur);
     piece.position.set(pose.x, pose.y + modele.poserSurZero * modele.facteur, pose.z);
     piece.rotation.y = pose.rotation;
+    // Un marquage mural est modelé À PLAT, pour être posé au sol. Accroché tel
+    // quel il restait horizontal contre la cloison, donc invisible par la
+    // tranche : trois panneaux de signalétique étaient bien là, et ne se
+    // voyaient pas. On les redresse.
+    if (pose.debout) piece.rotation.x = -Math.PI / 2;
     piece.traverse((noeud) => {
       if (!noeud.isMesh) return;
       noeud.castShadow = true;

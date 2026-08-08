@@ -59,17 +59,27 @@ export const MEUBLES = Object.freeze([
 
   // Signalétique. Ce sont ces marquages qui donnent au lieu un nom, donc une
   // administration, donc une histoire — pour trois fois rien.
-  { nom: 'panneau_signaletique', fichier: 'models/mobilier/panneau-signaletique.glb', pose: 'mur', hauteurVisee: 0.45, hauteurPose: 2.2, largeur: 0.9, poids: 5 },
-  { nom: 'logo_mural', fichier: 'models/mobilier/logo-mural.glb', pose: 'mur', hauteurVisee: 0.6, hauteurPose: 2.4, largeur: 0.8, poids: 3 },
-  { nom: 'lettre_a', fichier: 'models/mobilier/lettre-a.glb', pose: 'mur', hauteurVisee: 0.5, hauteurPose: 2.4, largeur: 0.5, poids: 2 },
-  { nom: 'chiffre_7', fichier: 'models/mobilier/chiffre-7.glb', pose: 'mur', hauteurVisee: 0.5, hauteurPose: 2.4, largeur: 0.5, poids: 2 },
+  { debout: true, nom: 'panneau_signaletique', fichier: 'models/mobilier/panneau-signaletique.glb', pose: 'mur', hauteurVisee: 0.45, hauteurPose: 2.2, largeur: 0.9, poids: 5 },
+  { debout: true, nom: 'logo_mural', fichier: 'models/mobilier/logo-mural.glb', pose: 'mur', hauteurVisee: 0.6, hauteurPose: 2.4, largeur: 0.8, poids: 3 },
+  { debout: true, nom: 'lettre_a', fichier: 'models/mobilier/lettre-a.glb', pose: 'mur', hauteurVisee: 0.5, hauteurPose: 2.4, largeur: 0.5, poids: 2 },
+  { debout: true, nom: 'chiffre_7', fichier: 'models/mobilier/chiffre-7.glb', pose: 'mur', hauteurVisee: 0.5, hauteurPose: 2.4, largeur: 0.5, poids: 2 },
 ]);
 
-/** Recul du mur, en mètres : de quoi ne pas s'y encastrer. */
+/** Recul du mur pour un meuble POSÉ, en mètres : de quoi ne pas s'y encastrer. */
 const CONTRE_MUR = 0.42;
 
+/**
+ * Recul d'un élément ACCROCHÉ. Bien plus faible : une bouche d'aération à
+ * quarante centimètres de sa cloison ne se lit pas comme fixée au mur mais
+ * comme flottant devant — ce qu'elle faisait.
+ */
+const CONTRE_MUR_ACCROCHE = 0.09;
+
+/** Marge d'angle : un panneau à cheval sur deux murs déborde dans le vide. */
+const MARGE_ANGLE = 0.9;
+
 /** Nombre de meubles visés par mètre linéaire de mur exploitable. */
-export const DENSITE_MOBILIER = 1.1;
+export const DENSITE_MOBILIER = 1.6;
 
 function hasard(graine) {
   let etat = (graine * 374761393) >>> 0;
@@ -103,8 +113,8 @@ export function meubler(chambre, { depart, graine = 11, densite = DENSITE_MOBILI
 
     const [nx, nz] = normale;
     const murEnX = nx === 0;
-    const longueur = (murEnX ? largeur : profondeur) * MODULE;
-    const recul = (murEnX ? profondeur : largeur) * MODULE / 2 - CONTRE_MUR;
+    const longueur = (murEnX ? largeur : profondeur) * MODULE - MARGE_ANGLE * 2;
+    const demiMur = (murEnX ? profondeur : largeur) * MODULE / 2;
     const emplacements = Math.max(1, Math.round(longueur * densite));
 
     for (let i = 0; i < emplacements; i++) {
@@ -116,6 +126,8 @@ export function meubler(chambre, { depart, graine = 11, densite = DENSITE_MOBILI
       let reste = suivant() * MEUBLES.reduce((s, e) => s + e.poids, 0);
       const choisi = MEUBLES.find((e) => (reste -= e.poids) <= 0) ?? MEUBLES[0];
 
+      const recul = demiMur
+        - (choisi.pose === 'mur' ? CONTRE_MUR_ACCROCHE : CONTRE_MUR);
       const x = murEnX ? long : nx * recul;
       const z = murEnX ? nz * recul : long;
       const demi = choisi.largeur / 2;
@@ -136,6 +148,7 @@ export function meubler(chambre, { depart, graine = 11, densite = DENSITE_MOBILI
         rotation: Math.atan2(-nx, -nz),
         largeur: choisi.largeur,
         hauteurVisee: choisi.hauteurVisee,
+        debout: choisi.debout === true,
       });
     }
   }

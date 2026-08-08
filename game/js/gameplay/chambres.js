@@ -59,10 +59,11 @@ const REVEIL = {
   sortie: 'plaque',
   epreuves: [{ id: 'liens', affordance: 'couper' }],
   porte: { mur: 'nord', ouverture: 2 },
-  decor: [
-    { type: 'jardiniere', largeur: 2, x: -2.6, z: -3.2 },
-    { type: 'jardiniere', largeur: 2, x: 2.6, z: 3.2, rotation: Math.PI },
-  ],
+  // Plus de jardinière : ce bac procédural était le dernier reste de l'époque
+  // où le décor était fabriqué par formule, et il jurait franchement à côté du
+  // mobilier et de la végétation modelés. Le meublage automatique et le semis
+  // par les joints remplissent désormais ce rôle, et le racontent mieux.
+  decor: [],
 };
 
 /** Chambre 2 — la serre abandonnée. Deux mécanismes simultanés. */
@@ -127,9 +128,7 @@ const SERRE = {
   // Plus de lierre procédural : ses tiges filiformes juraient à côté des vrais
   // modèles, et l'une d'elles se retrouvait derrière la verrière en arc. La
   // colonisation par les bords fait ce travail avec de la vraie végétation.
-  decor: [
-    { type: 'jardiniere', largeur: 3, x: 3.2, z: 2.6 },
-  ],
+  decor: [],
 };
 
 /** Chambres du jeu, dans l'ordre de progression. */
